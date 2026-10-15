@@ -470,7 +470,8 @@ want apps && apps
 print -r -- ""
 if (( NWARN )); then print -r -- "setup finished with $NWARN warning(s) (see WARN above)."
 else print -r -- "setup finished."; fi
-k_ready=$(ls "$ROOT"/instances/i*/mkparty-ready 2>/dev/null | wc -l | tr -d ' ')
+typeset -a ready=( "$ROOT"/instances/i*/mkparty-ready(N) )
+k_ready=${#ready}
 if (( k_ready < 12 )); then
   print -r -- "Last step (once, about 5 minutes, starts Dolphin; keep the Mac unlocked):"
   print -r -- "  ./mkparty setup --profiles"
