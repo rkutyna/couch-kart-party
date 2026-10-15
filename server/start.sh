@@ -82,6 +82,12 @@ else
         exit 1
     fi
 
+    # Matchmaking (local patch, serverbrowser/filter.go): offer a searching console only
+    # the open room with the most members, so the party does not split across hosts.
+    # On by default; WWFC_PREFER_ROOM=0 (environment or mkparty.conf) turns it off.
+    export WWFC_PREFER_ROOM="${WWFC_PREFER_ROOM:-1}"
+    echo "[wwfc] matchmaking: WWFC_PREFER_ROOM=$WWFC_PREFER_ROOM${WWFC_DEBUG_MATCH:+ WWFC_DEBUG_MATCH=$WWFC_DEBUG_MATCH}"
+
     # wwfc resolves config.xml, payload/, dlc/, game_list.tsv and logs/ relative to its cwd
     cd "$WFC_DIR" || exit 1
     nohup ./wwfc >> "$LOG_DIR/wwfc-stdout.log" 2>&1 < /dev/null &

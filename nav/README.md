@@ -203,7 +203,8 @@ character, vehicle, cup or course is in) come from party/web/catalog.json only.
   Dolphin's Volume Up / Volume Down hotkeys sent on Pipes/hk 34 times (Volume Up also
   clears Muted; 34 x 3 steps reach 100 or 0 from any value), so the result does not
   depend on the earlier state. Hotkeys work without focus because the profiles have
-  [General] HotkeysRequireFocus = False.
+  [General] HotkeysRequireFocus = False. NAV_TV_AUDIO=0: nothing is unmuted (no "AUDIO
+  i<k>: ON" line) and every instance is set to volume 0 once.
 
 ## Known limitations
 
@@ -221,10 +222,27 @@ character, vehicle, cup or course is in) come from party/web/catalog.json only.
   players accepted joiners much later (5 players: still open after 40 s); the only
   denials to smaller rooms came 51-114 s after the host's VS. Joins are one at a time (others get
   RESV_WAIT) and take a few seconds each, so with 2p instances a room ends at 6-8
-  players: 8-12 players split into two rooms (each races and is handed over); 7 always
+  players: 9-12 players split into two rooms (each races and is handed over; with 8 the
+  fourth 2p console usually stays alone, see below); 7 always
   fit (5 + a 2p console). `WWFC_DEBUG_MATCH=1 server/start.sh` logs each search filter
-  and room candidate; `WWFC_PREFER_ROOM=1` makes the server offer a searcher only the
-  open host with the most members (untested in a live round).
+  and room candidate.
+* Prefer-room (`WWFC_PREFER_ROOM`, on by default since 2026-10-15; server/start.sh sets
+  it unless the environment or mkparty.conf does; `WWFC_PREFER_ROOM=0 ./mkparty up`
+  after `./mkparty down` turns it off): when a search matches several open hosts, the
+  server answers with only the host whose room has the most members (log line "prefer
+  room of ..."). The game alternates two searches, one for open rooms (`dwc_hoststate
+  = 2`) and one for lone hosts (`dwc_hoststate = 0`), and a closed room drops out
+  itself (`dwc_suspend = 1`, 0-2 s after it reached 6 players), so the option only acts
+  when two rooms are open at the same time, or when a lone-host search still lists a
+  host whose room has just formed (its heartbeat says hoststate 0 for a moment). Live
+  rounds 2026-10-15 (fake phones; ON: 3, 7, 8 x2, 12 x2 players; OFF: 8, 12) never had
+  two open rooms; it acted once (12 players, 16:28:06: a lone-host search matched a
+  console that had just joined room EXGWRR and that room's host; it offered the host).
+  Results were the same ON and OFF: 3 and 7 in one room; 8 = a room of 6 + the fourth
+  2p console alone (it joins that room only when the room reopens after Course Poll,
+  so its phones miss the first race); 12 = 6 + 6, the second room formed 12-22 s after
+  the first denial and was handed over 76-82 s (ON) / 96-99 s (OFF, one round) after
+  Start.
 * logs/ grows by roughly 50-100 MB per hour of racing (captures); see the pruning above.
 * The game drops a player who makes no progress for roughly 30-60 s (no input, or stuck
   against a wall). When everybody else has been dropped, the last player gets the results

@@ -120,6 +120,17 @@ Mac's speakers, from Start on. All other games stay muted. The sound comes strai
 from Dolphin, so it is not in sync with the phones' video (the phones are a fraction
 of a second behind).
 
+    NAV_TV_AUDIO=0 ./mkparty up     # keep all games silent
+
+### Matchmaking
+
+The local game server prefers rooms (`WWFC_PREFER_ROOM`, on by default): when a console
+searching for a race could join more than one open room, the server offers it only the
+room with the most members, so that the party does not end up in several rooms by
+chance; consoles that find no open room still find each other as usual. To turn it off:
+`./mkparty down`, then `WWFC_PREFER_ROOM=0 ./mkparty up` (or set `WWFC_PREFER_ROOM=0`
+in `mkparty.conf`); it is read when the game server starts.
+
 ## What the players do
 
 1. Open the address on the phone. With the `https` address the browser warns about
@@ -156,7 +167,9 @@ navigator enters player A's choice in the first race, player B's in the next, an
 * More than 7 players end up in TWO races (for example 6 + 6). The game's matchmaking
   closes a room to newcomers a few seconds (3–8 s seen) after it reaches 6 or more
   players, and joining takes a few seconds per game; everybody still races, but not
-  all against each other.
+  all against each other. With 8 players (four split-screen games) the fourth game
+  usually finds nobody to race with: it joins the room only once the first race has
+  started, so its two players miss that race.
 * A phone shows "Game restarted. Rejoining…": the navigator noticed a crashed or
   frozen game and restarted it; that player joins the next race.
 * A player was "Disconnected from the room": the game drops a player who does not

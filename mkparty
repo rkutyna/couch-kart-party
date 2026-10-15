@@ -140,6 +140,8 @@ cmd_up() {
   curl -s -m 2 -X POST -H 'Content-Type: application/json' -d '{"message":"Getting the game ready..."}' \
     "http://127.0.0.1:$PARTY_PORT/api/nav/update" > /dev/null 2>&1 || true
   rm -f "$RUN/nav-status.json"
+  # NAV_TV_AUDIO=0 (environment or mkparty.conf): keep every game silent (no host audio).
+  export NAV_TV_AUDIO="${NAV_TV_AUDIO:-1}"
   (cd "$ROOT/nav" && perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' nohup python3 nav.py run "${warm[@]}" >> "$NAV_LOG" 2>&1 < /dev/null & print -r -- $! > "$NAV_PID")
   sleep 1
   trap 'print -r -- ""; print -r -- "(Ctrl-C) The party keeps running in the background. Stop it with: ./mkparty down"; exit 0' INT

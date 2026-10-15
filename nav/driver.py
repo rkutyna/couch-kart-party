@@ -1258,6 +1258,8 @@ class LobbyWatch(threading.Thread):
 # ---------------------------------------------------------------- instance pool
 WARM_1P = int(os.environ.get("NAV_WARM", "3"))        # single-player instances kept at the WFC menu
 WARM_2P = int(os.environ.get("NAV_WARM_2P", "0"))     # two-player instances kept at the WFC menu
+# NAV_TV_AUDIO=0: never unmute anything (no host audio; every game is kept at volume 0).
+TV_AUDIO = os.environ.get("NAV_TV_AUDIO", "1") != "0"
 LOBBY_STOP_GRACE = 90.0     # s an instance must be unneeded in the lobby before it is stopped
 BOOT_PARALLEL = 3           # Dolphins booting at the same time (a boot storm starves everything)
 OCC_SETTLE = 8.0            # s the number of phones must hold before the lobby pre-warms for it
@@ -1432,11 +1434,12 @@ class Runner:
 
     def _apply_audio(self):
         """Exactly the audio instance plays (volume 100); every other instance is at 0.
-        A relaunched instance boots muted (audio None) and is set again."""
+        A relaunched instance boots muted (audio None) and is set again. With NAV_TV_AUDIO=0
+        nothing is unmuted and every instance is also set to volume 0 once."""
         for k, w in list(self.workers.items()):
-            want = (k == self.audio_k)
+            want = TV_AUDIO and (k == self.audio_k)
             have = w.inst.audio
-            if (have is None and not want) or have == want or k in self.audio_busy:
+            if (have is None and not want and TV_AUDIO) or have == want or k in self.audio_busy:
                 continue
             if not w.inst.alive() or w.stable[0] is None:
                 continue
@@ -1708,8 +1711,12 @@ class Runner:
         host = snap.get("hostSlot") or 0
         locked = sorted(s for v in self.assign.values() for s in v)
         audio_slot = host if host in locked else (locked[0] if locked else 0)
-        self.audio_k = next((k for k, v in self.assign.items() if audio_slot in v), None)
-        self.log(f"AUDIO: the TV plays instance {self.audio_k} (slot {audio_slot}, host slot {host})")
+        if TV_AUDIO:
+            self.audio_k = next((k for k, v in self.assign.items() if audio_slot in v), None)
+            self.log(f"AUDIO: the TV plays instance {self.audio_k} (slot {audio_slot}, host slot {host})")
+        else:
+            self.audio_k = None
+            self.log("AUDIO: off for every instance (NAV_TV_AUDIO=0)")
         if missing:
             msg = f"Starting {len(missing)} more game{'s' if len(missing) > 1 else ''}..."
             try:
