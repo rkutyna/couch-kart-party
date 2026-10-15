@@ -1,0 +1,6 @@
+# Python packages for mkparty (python >= 3.11):
+#   numpy, Pillow   the navigator (nav/): screen capture analysis
+#   cryptography    building the game patch (wfc-patcher-wii's key generation and signing)
+numpy>=1.26
+pillow>=10.0
+cryptography>=41.0

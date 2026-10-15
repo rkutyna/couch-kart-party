@@ -1,0 +1,63 @@
+<!--
+     wfc-server configuration for mkparty, based on WiiLink's config_example.xml.
+     ./mkparty setup writes server/wfc-server/config.xml from this template with a random
+     database password and API secret and the PG_PORT of mkparty.conf. Never commit config.xml.
+-->
+<Config>
+     <!-- Single fallback address; the specific ones below override it -->
+     <address>127.0.0.1</address>
+
+     <!-- GameSpy services (serverbrowser 28910, gpcm 29900, gpsp 29901, gamestats 29920 TCP; QR2 27900 UDP; NATNEG 27901 UDP) -->
+     <gsAddress>127.0.0.1</gsAddress>
+
+     <!-- NAS HTTP server on loopback port 8080. Port 80 is fronted by server/nas80_proxy.py because non-root cannot bind 127.0.0.1:80 on macOS. -->
+     <nasAddress>127.0.0.1</nasAddress>
+     <nasPort>8080</nasPort>
+
+     <!-- NAS HTTPS: disabled -->
+     <nasAddressHttps>127.0.0.1</nasAddressHttps>
+     <nasPortHttps>443</nasPortHttps>
+     <enableHttps>false</enableHttps>
+
+     <!-- Empty = serve /payload from payload/binary/ and payload/private-key.pem in the cwd (integrated handler) -->
+     <payloadServerAddress></payloadServerAddress>
+
+     <frontendAddress>127.0.0.1:29998</frontendAddress>
+     <frontendBackendAddress>127.0.0.1:29999</frontendBackendAddress>
+     <backendAddress>127.0.0.1:29999</backendAddress>
+     <backendFrontendAddress>127.0.0.1:29998</backendFrontendAddress>
+
+     <!-- TLS material (unused while enableHttps is false) -->
+     <certPath>fullchain.pem</certPath>
+     <keyPath>privkey.pem</keyPath>
+     <enableHttpsExploitWii>false</enableHttpsExploitWii>
+     <enableHttpsExploitDS>false</enableHttpsExploitDS>
+     <certDerPathWii>naswii-cert.der</certDerPathWii>
+     <keyPathWii>naswii-key.pem</keyPathWii>
+     <certDerPathDS>nas-cert.der</certDerPathDS>
+     <wiiCertDerPathDS>nwc.der</wiiCertDerPathDS>
+     <keyPathDS>nas-key.pem</keyPathDS>
+
+     <!-- Accept the Dolphin default NG device ID (0x0403ac68) without per-user flags -->
+     <allowDefaultDolphinKeys>true</allowDefaultDolphinKeys>
+     <!-- never = a profile can only ever use the NG device IDs already on record -->
+     <allowMultipleDeviceIDs>never</allowMultipleDeviceIDs>
+     <allowConnectWithoutDeviceID>false</allowConnectWithoutDeviceID>
+
+     <!-- Database: private local PostgreSQL 16 cluster -->
+     <username>wiilink</username>
+     <password>@DB_PASSWORD@</password>
+     <databaseAddress>127.0.0.1:@PG_PORT@</databaseAddress>
+     <databaseName>wwfc</databaseName>
+
+     <!-- Logging: 4 = all; logs go to ./logs (symlinked to server/logs) -->
+     <logLevel>4</logLevel>
+     <logOutput>StdOutAndFile</logOutput>
+
+     <!-- Admin API secret (/api/* on the NAS HTTP port). Keep local. -->
+     <apiSecret>@API_SECRET@</apiSecret>
+
+     <eventReporting>
+          <logToDatabase>true</logToDatabase>
+     </eventReporting>
+</Config>

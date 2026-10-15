@@ -1,0 +1,22 @@
+# mkparty.conf - local settings of this Mac. NOT committed to git.
+# ./mkparty setup creates mkparty.conf from this file; edit it or pass --game / --dolphin.
+# One KEY="value" per line, absolute paths (the shell scripts source this file and the
+# navigator reads the same lines).
+
+# The Dolphin emulator app.
+DOLPHIN_APP="/Applications/Dolphin.app"
+
+# Your own Mario Kart Wii disc image (USA, RMCE01, revision 0), .wbfs or .iso.
+GAME_IMAGE=""
+
+# The powerpc-eabi toolchain for building the game patch, if not in a standard place
+# (setup looks at $DEVKITPPC, $DEVKITPRO/devkitPPC, /opt/devkitpro/devkitPPC and toolchain/opt).
+#DEVKITPPC="/opt/devkitpro/devkitPPC"
+
+# Port of the private PostgreSQL cluster (server/pgdata) used by the game server.
+# Changing it after setup also needs server/wfc-server/config.xml and server/pgdata/postgresql.conf.
+#PG_PORT="54329"
+
+# Phone server ports (http, https).
+#PARTY_PORT="8000"
+#HTTPS_PORT="8443"

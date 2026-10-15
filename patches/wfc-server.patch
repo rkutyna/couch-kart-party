@@ -1,0 +1,310 @@
+diff --git a/filter/eval.go b/filter/eval.go
+index c6c2bac..c2d045e 100644
+--- a/filter/eval.go
++++ b/filter/eval.go
+@@ -135,6 +135,14 @@ func (e *expression) evalEquals(args []*TreeNode) int64 {
+ 			if n.Name == "rk" && e.queryGame == "mariokartwii" {
+ 				return e.evalEqualsRK(e.getString(args[1]))
+ 			}
++			// Local change: Mario Kart Wii appends "p = 0" / "p = 1" to its matchmaking
++			// filter, a per-client flag of the game's own state. On this private server
++			// the party's instances must all land in one room whatever the flag says
++			// (two profiles flipped to p = 1 and never matched the third), so ignore it,
++			// like the ev/eb override in evalMathOperator.
++			if n.Name == "p" && e.queryGame == "mariokartwii" {
++				return 1
++			}
+ 		}
+ 
+ 		if e.getString(args[0]) == e.getString(args[1]) {
+diff --git a/filter/eval_test.go b/filter/eval_test.go
+new file mode 100644
+index 0000000..a0cbf84
+--- /dev/null
++++ b/filter/eval_test.go
+@@ -0,0 +1,44 @@
++package filter
++
++import "testing"
++
++func evalFilter(t *testing.T, expr string, server map[string]string, game string) int64 {
++	t.Helper()
++	tree, err := Parse(expr)
++	if err != nil {
++		t.Fatalf("parse %q: %v", expr, err)
++	}
++	ret, err := Eval(tree, server, game)
++	if err != nil {
++		t.Fatalf("eval %q: %v", expr, err)
++	}
++	return ret
++}
++
++func TestMarioKartWiiIgnoresPFlag(t *testing.T) {
++	server := map[string]string{
++		"dwc_mver": "90", "dwc_pid": "1000000000", "maxplayers": "11", "numplayers": "1",
++		"dwc_mtype": "0", "dwc_hoststate": "2", "dwc_suspend": "0",
++		"rk": "vs", "ev": "4601", "p": "1",
++	}
++	for _, p := range []string{"0", "1"} {
++		expr := "dwc_mver = 90 and dwc_pid != 1000000001 and maxplayers = 11 and numplayers < 11 and dwc_mtype = 0 and dwc_hoststate = 2 and dwc_suspend = 0 and (rk = 'vs' and ev >= 4220 and ev <= 5720 and p = " + p + ")"
++		if got := evalFilter(t, expr, server, "mariokartwii"); got != 1 {
++			t.Errorf("mariokartwii with p = %s against host p = 1: got %d, want 1", p, got)
++		}
++	}
++
++	// Other terms still apply: a battle search must not match a VS host.
++	expr := "dwc_mver = 90 and (rk = 'bt' and eb >= 1 and eb <= 9999 and p = 0)"
++	if got := evalFilter(t, expr, server, "mariokartwii"); got != 0 {
++		t.Errorf("rk mismatch: got %d, want 0", got)
++	}
++
++	// Other games keep the plain comparison.
++	if got := evalFilter(t, "p = 0", server, "othergame"); got != 0 {
++		t.Errorf("othergame p = 0 against p = 1: got %d, want 0", got)
++	}
++	if got := evalFilter(t, "p = 1", server, "othergame"); got != 1 {
++		t.Errorf("othergame p = 1 against p = 1: got %d, want 1", got)
++	}
++}
+diff --git a/gpcm/main.go b/gpcm/main.go
+index d13fe91..201a9a4 100644
+--- a/gpcm/main.go
++++ b/gpcm/main.go
+@@ -248,6 +248,12 @@ func HandlePacket(index uint64, data []byte) {
+ 	commands = session.handleCommand("wl:exlogin", commands, session.exLogin)
+ 	commands = session.ignoreCommand("logout", commands)
+ 
++	if !session.LoggedIn {
++		// Local change: the payload can send a queued wl:report (e.g. a finish time from an
++		// aborted race) before logging in again; drop it instead of failing the connection.
++		commands = session.ignoreCommand("wl:report", commands)
++	}
++
+ 	if len(commands) != 0 && !session.LoggedIn {
+ 		logging.Error(session.ModuleName, "Attempt to run command before login:", aurora.Cyan(commands[0]))
+ 		session.replyError(ErrNotLoggedIn)
+diff --git a/nas/main.go b/nas/main.go
+index ac4b039..95a7b85 100644
+--- a/nas/main.go
++++ b/nas/main.go
+@@ -122,7 +122,21 @@ func Shutdown() {
+ 	}
+ }
+ 
++// Local change (no-DNS client build): the patched game reaches the NAS by IP literal
++// (http://127.0.0.1:8080/w1, /payload, /ac), so the Host header carries no "nas."
++// name. Route those auth paths by path when the Host is an IPv4 literal; everything
++// else (e.g. /api/*) keeps going to the default mux as before.
++var (
++	ipHostRegex   = regexp.MustCompile(`^\d{1,3}(\.\d{1,3}){3}(:\d+)?$`)
++	authPathRegex = regexp.MustCompile(`^/(ac|pr|payload|payload/.*|w[0-9]|nastest\.jsp)$`)
++)
++
+ func handleRequest(w http.ResponseWriter, r *http.Request) {
++	if ipHostRegex.MatchString(r.Host) && authPathRegex.MatchString(r.URL.Path) {
++		authMux.ServeHTTP(w, r)
++		return
++	}
++
+ 	// Check for host-specific muxes
+ 	for regex, mux := range hostMuxes {
+ 		if regex.MatchString(r.Host) {
+diff --git a/nas/payload.go b/nas/payload.go
+index d3c23ff..cec00f8 100644
+--- a/nas/payload.go
++++ b/nas/payload.go
+@@ -45,7 +45,10 @@ func downloadStage1(w http.ResponseWriter, r *http.Request) {
+ 	_, err = w.Write(payload)
+ 	if err != nil {
+ 		logging.Error("NAS", "Error writing stage 1 payload:", err)
++		return
+ 	}
++	// Local change: log successful downloads (Host shows how the client addressed us)
++	logging.Notice(getModuleName(r), "Stage 1 download:", aurora.Cyan(path), "Host:", aurora.Cyan(r.Host))
+ }
+ 
+ func forwardPayloadRequest(w http.ResponseWriter, r *http.Request) {
+@@ -177,6 +180,10 @@ func handlePayloadRequest(w http.ResponseWriter, r *http.Request) {
+ 
+ 		// Generate the salt hash
+ 		saltHashData := "payload?g=" + query["g"][0] + "&s=" + query["s"][0]
++		if d, ok := query["d"]; ok {
++			// Newer stage1 sends the device ID first: payload?d=...&g=...&s=...
++			saltHashData = "payload?d=" + d[0] + "&g=" + query["g"][0] + "&s=" + query["s"][0]
++		}
+ 
+ 		hashCtx := sha256.New()
+ 		_, err = hashCtx.Write([]byte(saltHashData))
+@@ -232,5 +239,8 @@ func handlePayloadRequest(w http.ResponseWriter, r *http.Request) {
+ 	_, err = w.Write(dat)
+ 	if err != nil {
+ 		logging.Error("NAS", "Error writing payload response body:", err)
++		return
+ 	}
++	// Local change: log successful downloads (Host shows how the client addressed us)
++	logging.Notice(moduleName, "Payload download:", aurora.Cyan(game), aurora.BrightCyan(len(dat)), "bytes, Host:", aurora.Cyan(r.Host))
+ }
+diff --git a/qr2/heartbeat.go b/qr2/heartbeat.go
+index a5519cd..d3c25cd 100644
+--- a/qr2/heartbeat.go
++++ b/qr2/heartbeat.go
+@@ -65,6 +65,19 @@ func heartbeat(moduleName string, conn net.PacketConn, addr net.UDPAddr, buffer
+ 	payload["publicip"] = realIP
+ 	payload["publicport"] = realPort
+ 
++	// Local change (offline operation): a client that reaches us over loopback runs on
++	// this machine. Peers with the same public IP are told to use "localip0", which is
++	// whatever interface address the emulator reports (the LAN address, or a fallback
++	// like 10.0.1.30 when the machine has no network, which is not routable). Advertise
++	// loopback instead so peer-to-peer traffic never depends on a network interface.
++	if isLoopbackAddr(addr.String()) {
++		for key := range payload {
++			if strings.HasPrefix(key, "localip") {
++				payload[key] = "127.0.0.1"
++			}
++		}
++	}
++
+ 	lookupAddr := makeLookupAddr(addr.String())
+ 
+ 	statechanged, ok := payload["statechanged"]
+@@ -175,3 +188,12 @@ func isPublicMatchRegion(rk string) (bool, bool) {
+ 	}
+ 	return false, false
+ }
++
++func isLoopbackAddr(address string) bool {
++	host, _, err := net.SplitHostPort(address)
++	if err != nil {
++		return false
++	}
++	ip := net.ParseIP(host)
++	return ip != nil && ip.IsLoopback()
++}
+diff --git a/qr2/message.go b/qr2/message.go
+index 9d191df..9fbf585 100644
+--- a/qr2/message.go
++++ b/qr2/message.go
+@@ -158,6 +158,9 @@ func SendClientMessage(senderIP string, destSearchID uint64, message []byte) {
+ 				matchData.Reservation.PublicPort = uint16((sender.SearchID >> 32) & 0xffff)
+ 				matchData.Reservation.LocalIP = 0
+ 				matchData.Reservation.LocalPort = 0
++			} else if sender.Addr.IP.IsLoopback() && matchData.Reservation.LocalIP != 0 {
++				// Local change (offline operation): see the localip note in heartbeat.go
++				matchData.Reservation.LocalIP = 0x7F000001
+ 			}
+ 		}
+ 
+@@ -189,6 +192,9 @@ func SendClientMessage(senderIP string, destSearchID uint64, message []byte) {
+ 				matchData.ResvOK.PublicPort = uint16((sender.SearchID >> 32) & 0xffff)
+ 				matchData.ResvOK.LocalIP = 0
+ 				matchData.ResvOK.LocalPort = 0
++			} else if sender.Addr.IP.IsLoopback() && matchData.ResvOK.LocalIP != 0 {
++				// Local change (offline operation): see the localip note in heartbeat.go
++				matchData.ResvOK.LocalIP = 0x7F000001
+ 			}
+ 		}
+ 
+@@ -205,6 +211,11 @@ func SendClientMessage(senderIP string, destSearchID uint64, message []byte) {
+ 				logging.Error(moduleName, "TELL_ADDR: Local port is reserved")
+ 				return
+ 			}
++
++			// Local change (offline operation): see the localip note in heartbeat.go
++			if sender.Addr.IP.IsLoopback() {
++				matchData.TellAddr.LocalIP = 0x7F000001
++			}
+ 		}
+ 
+ 		if useSearchID {
+diff --git a/serverbrowser/filter.go b/serverbrowser/filter.go
+index 6502c51..6cc89ca 100644
+--- a/serverbrowser/filter.go
++++ b/serverbrowser/filter.go
+@@ -1,12 +1,38 @@
+ package serverbrowser
+ 
+ import (
++	"os"
++	"strings"
+ 	"wwfc/filter"
+ 	"wwfc/logging"
+ 
+ 	"github.com/logrusorgru/aurora/v3"
+ )
+ 
++// debugMatch (env WWFC_DEBUG_MATCH=1, local patch) logs every candidate room of a
++// matchmaking search and whether it matched, to see why consoles do not find a room.
++var debugMatch = os.Getenv("WWFC_DEBUG_MATCH") == "1"
++
++// preferRoom (env WWFC_PREFER_ROOM=1, local patch): when a matchmaking search matches
++// several open hosts, answer with only the host whose room already has the most members
++// (sessions in a room carry "+joinindex"; the host has one "+conn_<i>" key per member).
++// Lone hosts are only offered when no room is open. Without it, the list comes out of a
++// Go map in random order, and searchers that pick different hosts split the party.
++var preferRoom = os.Getenv("WWFC_PREFER_ROOM") == "1"
++
++func roomMembers(server map[string]string) int {
++	if server["+joinindex"] != "0" {
++		return 0
++	}
++	n := 0
++	for k := range server {
++		if strings.HasPrefix(k, "+conn_") {
++			n++
++		}
++	}
++	return n
++}
++
+ // DWC makes requests in the following formats:
+ // Matching ver 03: dwc_mver = %d and dwc_pid != %u and maxplayers = %d and numplayers < %d and dwc_mtype = %d and dwc_hoststate = %u and dwc_suspend = %u and (%s)
+ // Matching ver 90: dwc_mver = %d and dwc_pid != %u and maxplayers = %d and numplayers < %d and dwc_mtype = %d and dwc_mresv != dwc_pid and (%s)
+@@ -24,6 +50,9 @@ func filterServers(moduleName string, servers []map[string]string, queryGame str
+ 	}
+ 
+ 	var filtered []map[string]string
++	if debugMatch {
++		logging.Info(moduleName, "search filter:", expression)
++	}
+ 
+ 	for _, server := range servers {
+ 		if server["gamename"] != queryGame {
+@@ -43,12 +72,30 @@ func filterServers(moduleName string, servers []map[string]string, queryGame str
+ 			logging.Error(moduleName, "Error evaluating filter:", err.Error())
+ 			return []map[string]string{}
+ 		}
++		if debugMatch {
++			logging.Info(moduleName, "candidate pid", server["dwc_pid"], "hoststate", server["dwc_hoststate"],
++				"numplayers", server["numplayers"], "maxplayers", server["maxplayers"], "suspend", server["dwc_suspend"],
++				"mtype", server["dwc_mtype"], "p", server["p"], "matched", ret != 0)
++		}
+ 
+ 		if ret != 0 {
+ 			filtered = append(filtered, server)
+ 		}
+ 	}
+ 
++	if preferRoom && len(filtered) > 1 {
++		best, bestN := -1, 0
++		for i, server := range filtered {
++			if n := roomMembers(server); n > bestN {
++				best, bestN = i, n
++			}
++		}
++		if best >= 0 {
++			logging.Info(moduleName, "prefer room of", server0(filtered[best]), "with", bestN, "members over", len(filtered)-1, "other hosts")
++			filtered = []map[string]string{filtered[best]}
++		}
++	}
++
+ 	if len(filtered) != 0 {
+ 		logging.Info(moduleName, "Matched", aurora.BrightCyan(len(filtered)), "servers")
+ 	}
+@@ -95,3 +142,5 @@ func filterSelfLookup(moduleName string, servers []map[string]string, queryGame
+ 	logging.Info(moduleName, "Self lookup for", aurora.Cyan(dwcPid), "matched", aurora.BrightCyan(len(filtered)), "servers via public IP")
+ 	return filtered
+ }
++
++func server0(server map[string]string) string { return server["dwc_pid"] }

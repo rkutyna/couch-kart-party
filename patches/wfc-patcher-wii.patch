@@ -1,0 +1,143 @@
+diff --git a/include/wwfcConstants.h b/include/wwfcConstants.h
+index a79cd99..2cb7f91 100644
+--- a/include/wwfcConstants.h
++++ b/include/wwfcConstants.h
+@@ -14,4 +14,11 @@
+ #  endif
+ #endif
+ 
++// LOCAL (no-DNS build): every server host name is replaced by this IP literal,
++// in the stage0 Gecko code, in stage1 and in the payload's resolver hooks, so the
++// game never issues a DNS query for the private server.
++#ifndef WWFC_LOCAL_IP
++#  define WWFC_LOCAL_IP "127.0.0.1"
++#endif
++
+ #endif // WWFC_CONSTANTS
+\ No newline at end of file
+diff --git a/patch/wwfcPatch.s b/patch/wwfcPatch.s
+index 76506d2..4ef6a33 100644
+--- a/patch/wwfcPatch.s
++++ b/patch/wwfcPatch.s
+@@ -297,13 +297,15 @@ GCT_WRITE_INSTR(ADDRESS_DWCi_Auth_SendRequest + 0x58, li r6, 0x1000 - 3)
+ GCT_ENDIF(1)
+ 
+ 
+-GCT_STRING(ADDRESS_AVAILABLE_URL + 0xD, AvailableURLOverride)
+-    .ascii  "gs." WWFC_DOMAIN "\0"
++// LOCAL (no-DNS build): replace the whole "%s.available.gamespy.com" format string
++// with an IP literal, so the availability check never does a host-name lookup.
++GCT_STRING(ADDRESS_AVAILABLE_URL, AvailableURLOverride)
++    .ascii  WWFC_LOCAL_IP "\0"
+ GCT_STRING_END(AvailableURLOverride)
+ 
+ 
+ GCT_STRING(ADDRESS_NASWII_AC_URL + 0x4, AuthURLOverride) // 0x8027A42C
+-    .ascii  "://nas." WWFC_DOMAIN "/w1\0"
++    .ascii  "://" WWFC_LOCAL_IP ":8080/w1\0"
+ GCT_STRING_END(AuthURLOverride)
+ 
+ 
+diff --git a/payload/wwfcSupport.cpp b/payload/wwfcSupport.cpp
+index 835f6cb..01a14d4 100644
+--- a/payload/wwfcSupport.cpp
++++ b/payload/wwfcSupport.cpp
+@@ -14,54 +14,28 @@ WWFC_DEFINE_PATCH = Patch::Write(
+     (u32[]) {AUTH_HANDLERESP_UNPATCH}
+ );
+ 
++// LOCAL (no-DNS build): any host name inside one of the online-service domains (or
++// inside WWFC_DOMAIN, should one ever be passed) is replaced by the IP literal
++// WWFC_LOCAL_IP. gethostbyname / SOInetAtoN / SOGetAddrInfo then see a numeric
++// address, so no DNS query is made and no list of host names has to be known.
+ static const char* FixHostname(const char* name, char* out)
+ {
+-    if (std::strlen(name) > 256 - sizeof(WWFC_DOMAIN)) {
+-        // Hostname is too big to replace
+-        return name;
+-    }
+-
+     for (u32 i = 0; name[i] != '\0'; i++) {
+-        auto replaceDomain = [&](const char* check, u32 checkSize,
+-                                 const char* replace, u32 replaceSize) {
+-            if (std::strncmp(name + i, check, checkSize) != 0) {
+-                return false;
+-            }
+-
+-            // Replace with the custom hostname
+-            std::memcpy(out, name, i);
+-            std::memcpy(out + i, replace, replaceSize);
+-            std::strcpy(out + i + replaceSize, name + i + checkSize);
+-            WWFC_LOG_INFO_FMT("Hostname: %s -> %s", name, out);
+-            return true;
++        auto inDomain = [&](const char* check, u32 checkSize) {
++            return std::strncmp(name + i, check, checkSize) == 0;
+         };
+ 
+-        // Replace nintendowifi.net with the custom name
+-        if (replaceDomain(
+-                "nintendowifi.net", sizeof("nintendowifi.net") - 1, WWFC_DOMAIN,
+-                sizeof(WWFC_DOMAIN) - 1
+-            )) {
+-            return out;
+-        }
+-
+-        // Redirect gamespy.com to the "gs" subdomain, required for some games
+-        if (replaceDomain(
+-                "gamespy.com", sizeof("gamespy.com"), "gs." WWFC_DOMAIN,
+-                sizeof("gs." WWFC_DOMAIN) - 1
+-            )) {
+-            return out;
+-        }
+-
+-        // WiiLink WFC patch over an already Wiimmfi patched game
+-        if (replaceDomain(
+-                "wiimmfi.de", sizeof("wiimmfi.de") - 1, WWFC_DOMAIN,
+-                sizeof(WWFC_DOMAIN) - 1
+-            )) {
++        if (inDomain("nintendowifi.net", sizeof("nintendowifi.net") - 1) ||
++            inDomain("gamespy.com", sizeof("gamespy.com") - 1) ||
++            inDomain("wiimmfi.de", sizeof("wiimmfi.de") - 1) ||
++            inDomain(WWFC_DOMAIN, sizeof(WWFC_DOMAIN) - 1)) {
++            std::strcpy(out, WWFC_LOCAL_IP);
++            WWFC_LOG_INFO_FMT("Hostname: %s -> %s", name, out);
+             return out;
+         }
+     }
+ 
+-    // No custom hostname
++    // Not one of ours (e.g. a peer's numeric address)
+     return name;
+ }
+ 
+@@ -135,7 +109,7 @@ WWFC_DEFINE_PATCH = Patch::BranchWithCTR(
+ WWFC_DEFINE_PATCH = Patch::WriteASM(
+     WWFC_PATCH_LEVEL_SUPPORT, //
+     ADDRESS_NHTTP_HTTPS_PORT_PATCH, //
+-    1, ASM_LAMBDA((), li r0, 80)
++    1, ASM_LAMBDA((), li r0, 8080)
+ );
+ WWFC_DEFINE_PATCH = Patch::WriteASM(
+     WWFC_PATCH_LEVEL_SUPPORT, //
+@@ -157,7 +131,7 @@ WWFC_DEFINE_PATCH = Patch::WriteASM(
+ void ChangeAuthURL()
+ {
+     *reinterpret_cast<const char**>(ADDRESS_NASWII_AC_URL_POINTER) =
+-        "http://nas." WWFC_DOMAIN "/ac";
++        "http://" WWFC_LOCAL_IP ":8080/ac";
+ }
+ 
+ } // namespace wwfc::Support
+diff --git a/stage1/wwfcStage1.cpp b/stage1/wwfcStage1.cpp
+index 59f05fd..beb5f66 100644
+--- a/stage1/wwfcStage1.cpp
++++ b/stage1/wwfcStage1.cpp
+@@ -247,7 +247,7 @@ struct Stage1 {
+ #endif
+     };
+ 
+-#define BASE_URL_PART1 "http://nas." WWFC_DOMAIN
++#define BASE_URL_PART1 "http://" WWFC_LOCAL_IP ":8080"
+ #define BASE_URL_PART2 "/payload"
+ #define BASE_URL (BASE_URL_PART1 BASE_URL_PART2)
+ 
