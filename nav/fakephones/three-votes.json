@@ -1,0 +1,5 @@
+[
+  {"name": "Ann", "character": "bowser", "vehicle": "wario-bike", "drift": "manual", "votes": ["luigi-circuit", "random", "mario-circuit"]},
+  {"name": "Ben", "character": "yoshi", "vehicle": "mach-bike", "drift": "auto", "votes": ["mario-circuit", "n64-sherbet-land", "luigi-circuit"]},
+  {"name": "Cat", "character": "toad", "vehicle": "bullet-bike", "drift": "manual", "votes": ["ds-delfino-square", "coconut-mall", "random"]}
+]

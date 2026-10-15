@@ -1,0 +1,72 @@
+[
+ {
+  "name": "Ann",
+  "character": "mario",
+  "vehicle": "standard-kart-m",
+  "drift": "auto",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Ben",
+  "character": "luigi",
+  "vehicle": "classic-dragster",
+  "drift": "manual",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Cat",
+  "character": "peach",
+  "vehicle": "wild-wing",
+  "drift": "auto",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Dan",
+  "character": "mario",
+  "vehicle": "mach-bike",
+  "drift": "manual",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Eve",
+  "character": "luigi",
+  "vehicle": "standard-kart-m",
+  "drift": "auto",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Fay",
+  "character": "peach",
+  "vehicle": "sugarscoot",
+  "drift": "manual",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Gus",
+  "character": "mario",
+  "vehicle": "classic-dragster",
+  "drift": "auto",
+  "votes": [
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ }
+]

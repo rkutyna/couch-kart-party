@@ -1,0 +1,5 @@
+[
+  {"name": "Ann", "character": "mario", "vehicle": "standard-kart-m", "drift": "auto", "votes": ["luigi-circuit", "luigi-circuit"], "lockAfter": 2},
+  {"name": "Ben", "character": "luigi", "vehicle": "classic-dragster", "drift": "auto", "votes": ["luigi-circuit", "luigi-circuit"], "lockAfter": -1},
+  {"name": "Cat", "character": "peach", "vehicle": "wild-wing", "drift": "auto", "votes": ["luigi-circuit", "mario-circuit"], "lockAfter": 3, "dropAtVote": 1}
+]

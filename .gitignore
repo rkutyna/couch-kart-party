@@ -1,0 +1,60 @@
+# Allowlist: everything is ignored unless listed below. The working folder also holds
+# the disc image, Dolphin profiles and saves (instances/), the upstream clones
+# (server/wfc-server, patcher/*), the toolchain, keys, certificates, the database,
+# logs and build output, none of which belong in git. Add new source paths here.
+/*
+
+!/.gitignore
+!/README.md
+!/mkparty
+!/setup.sh
+!/mkparty.conf.example
+!/requirements.txt
+!/patches/
+
+!/capture/
+/capture/*
+!/capture/stream_window.sh
+!/capture/wincap.swift
+
+!/nav/
+/nav/*
+!/nav/*.py
+!/nav/README.md
+!/nav/fakephones/
+
+!/party/
+/party/*
+!/party/*.go
+!/party/go.mod
+!/party/go.sum
+!/party/make-cert.sh
+!/party/web/
+!/party/cmd/
+# game-derived pictures (distributed separately for now)
+/party/cmd/fakephones/icons/
+
+!/run/
+/run/*
+!/run/*.sh
+!/run/src/
+
+!/server/
+/server/*
+!/server/start.sh
+!/server/stop.sh
+!/server/netcheck.sh
+!/server/nas80_proxy.py
+!/server/config.template.xml
+
+!/toolchain/
+/toolchain/*
+!/toolchain/build-devkitppc.sh
+
+# never, anywhere
+__pycache__/
+*.pyc
+.DS_Store
+*.pem
+*.key
+*.log

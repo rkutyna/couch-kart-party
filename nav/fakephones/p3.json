@@ -1,0 +1,38 @@
+[
+ {
+  "name": "Ann",
+  "character": "mario",
+  "vehicle": "standard-kart-m",
+  "drift": "auto",
+  "votes": [
+   "luigi-circuit",
+   "luigi-circuit",
+   "moo-moo-meadows"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Ben",
+  "character": "luigi",
+  "vehicle": "classic-dragster",
+  "drift": "manual",
+  "votes": [
+   "mario-circuit",
+   "luigi-circuit",
+   "coconut-mall"
+  ],
+  "lockAfter": 3
+ },
+ {
+  "name": "Cat",
+  "character": "peach",
+  "vehicle": "wild-wing",
+  "drift": "auto",
+  "votes": [
+   "random",
+   "luigi-circuit",
+   "luigi-circuit"
+  ],
+  "lockAfter": 3
+ }
+]

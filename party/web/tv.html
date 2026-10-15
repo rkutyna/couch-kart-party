@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Party TV</title>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="tv.css">
+</head>
+<body class="tv">
+<section id="roster" class="roster">
+  <header class="rosterHead">
+    <h1 id="rosterTitle">Lobby</h1>
+    <div id="rosterMsg" class="rosterMsg"></div>
+  </header>
+  <div class="rosterBody">
+    <div class="rosterMain">
+      <div id="rosterList" class="rosterList"></div>
+      <div id="rosterFoot" class="rosterFoot"></div>
+    </div>
+    <div id="joinSlot" class="joinSlot"></div>
+  </div>
+</section>
+<main id="grid" class="grid" hidden>
+  <div id="tiles" class="tiles"></div>
+</main>
+<button id="fsBtn" class="fsBtn" type="button" hidden>Fullscreen</button>
+<div id="liveNote" class="liveNote" hidden>TV view uses no extra encoding; best shown on the laptop's own screen/HDMI (each tile is a separate stream over Wi-Fi if opened on another device).</div>
+<aside id="joinPanel" class="joinPanel" aria-label="How to join" hidden>
+  <h2 class="joinTitle">Join the party</h2>
+  <img id="joinQr" class="joinQr" alt="QR code for the party web address" hidden>
+  <div id="joinUrl" class="joinUrl"></div>
+  <button id="joinToggle" class="joinToggle" type="button">Hide QR</button>
+  <div id="joinNone" class="joinNone" hidden>No network address found. Connect this Mac to a network, then reload this page.</div>
+  <div id="joinOthers" class="joinOthers"></div>
+  <p id="joinNote" class="joinNote">On the warning page tap Show details &rarr; visit this website (iPhone) / Advanced &rarr; Proceed (Android)</p>
+</aside>
+<script src="tv.js"></script>
+</body>
+</html>

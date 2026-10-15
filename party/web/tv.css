@@ -1,0 +1,170 @@
+[hidden] { display: none !important; }
+body.tv { overflow: auto; touch-action: auto; user-select: none; }
+/* live grid: a full-screen black stage with the tiles centred in it. tv.js sets
+   --tw / --th and the .tiles box so that the shape (cols x rows) fills the screen. */
+.grid {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  overflow: hidden;
+}
+.tiles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+}
+.tile {
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--tw, 320px);
+  height: var(--th, 180px);
+  margin: 0;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.tile video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.tile.reconnecting video { opacity: 0.25; }
+.tile figcaption {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  max-width: calc(100% - 16px);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.85);
+  font: 600 14px -apple-system, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.tile .vbadge {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  max-width: calc(100% - 16px);
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(255, 210, 63, 0.92);
+  color: #111;
+  font: 700 14px -apple-system, system-ui, sans-serif;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+.tile .reco {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: #ddd;
+  font: 600 20px -apple-system, system-ui, sans-serif;
+  pointer-events: none;
+}
+.tile.reconnecting .reco { display: flex; }
+
+/* live-only controls: fullscreen (top right), join QR (bottom right), note (bottom left) */
+.fsBtn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  z-index: 6;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #ddd;
+  font: 600 14px -apple-system, system-ui, sans-serif;
+  cursor: pointer;
+}
+.liveNote {
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 5;
+  max-width: calc(100vw - 260px);
+  font: 12px -apple-system, system-ui, sans-serif;
+  color: #888;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* lobby roster */
+.roster { padding: 24px 32px; box-sizing: border-box; min-height: 100vh; min-height: 100dvh; color: #fff; font-family: -apple-system, system-ui, sans-serif; }
+.rosterHead { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin-bottom: 18px; }
+.rosterHead h1 { margin: 0; font-size: 44px; }
+.rosterMsg { color: #ffd23f; font-size: 22px; }
+.rosterList { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.rCard { background: rgba(255, 255, 255, 0.06); border: 2px solid rgba(255, 255, 255, 0.12); border-radius: 16px; padding: 16px 18px; min-height: 130px; box-sizing: border-box; }
+.rCard.free { opacity: 0.35; }
+.rCard.ready { border-color: #5cff8a; }
+.rCard .slotLine { display: flex; align-items: center; gap: 10px; font-size: 18px; color: #aaa; }
+.rCard .dot { width: 12px; height: 12px; border-radius: 50%; background: #666; }
+.rCard .dot.on { background: #5cff8a; }
+.rCard .who { font-size: 34px; font-weight: 800; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rCard .meta { font-size: 19px; color: #ddd; margin-top: 6px; line-height: 1.4; }
+.rCard .ready-tag { font-weight: 800; color: #5cff8a; }
+.rCard .vote { color: #ffd23f; }
+.rCard .rStatus { color: #9cf; font-size: 16px; margin-top: 6px; }
+.rosterFoot { margin-top: 20px; font-size: 22px; color: #ccc; }
+
+/* how to join: beside the roster in the lobby, a small corner while live */
+.rosterBody { display: flex; gap: 32px; align-items: flex-start; }
+.rosterMain { flex: 1 1 auto; min-width: 0; }
+.joinSlot { flex: 0 0 auto; }
+.joinPanel {
+  width: 420px;
+  box-sizing: border-box;
+  padding: 22px 24px 20px;
+  border-radius: 22px;
+  background: #fff;
+  color: #111;
+  text-align: center;
+  font-family: -apple-system, system-ui, sans-serif;
+}
+.joinTitle { margin: 0 0 14px; font-size: 34px; }
+.joinQr { display: block; width: 340px; height: 340px; margin: 0 auto; image-rendering: pixelated; }
+.joinUrl { margin-top: 14px; font: 800 28px ui-monospace, Menlo, monospace; overflow-wrap: anywhere; }
+.joinNone { margin-top: 10px; font-size: 20px; color: #a00; }
+.joinOthers { margin-top: 14px; font-size: 15px; color: #555; line-height: 1.5; overflow-wrap: anywhere; }
+.joinNote { margin: 16px 0 0; font-size: 16px; color: #333; }
+.joinPanel.corner {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 200px;
+  padding: 10px;
+  border-radius: 14px;
+  z-index: 5;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+.joinPanel.corner .joinTitle, .joinPanel.corner .joinOthers, .joinPanel.corner .joinNote, .joinPanel.corner .joinNone { display: none; }
+.joinPanel.corner .joinQr { width: 180px; height: 180px; }
+.joinPanel.corner .joinUrl { margin-top: 6px; font-size: 12px; }
+.joinToggle { display: none; margin-top: 6px; padding: 3px 10px; border: 1px solid #bbb; border-radius: 8px; background: #f2f2f2; color: #333; font: 600 12px -apple-system, system-ui, sans-serif; cursor: pointer; }
+.joinPanel.corner .joinToggle { display: inline-block; }
+.joinPanel.corner.collapsed { width: auto; padding: 4px; border-radius: 10px; }
+.joinPanel.corner.collapsed .joinQr, .joinPanel.corner.collapsed .joinUrl { display: none; }
+.joinPanel.corner.collapsed .joinToggle { margin-top: 0; }
+.rCard.racing { border-color: #ffd23f; }
+.rCard.sitout { opacity: 0.6; }
+.rCard .badge { margin-left: auto; font-size: 14px; font-weight: 800; padding: 2px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.12); color: #ccc; }
+.rCard .badge.go { background: #ffd23f; color: #111; }
+.rosterEmpty { font-size: 22px; color: #aaa; padding: 12px 0; }

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Party Controller</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<video id="video" autoplay playsinline muted></video>
+
+<div id="status" class="status">Not joined</div>
+<div id="netOverlay" class="netOverlay" hidden></div>
+<div id="rotate" class="rotate">Turn your phone sideways</div>
+
+<div id="overlay" class="overlay">
+  <div class="card">
+    <h1>Party</h1>
+    <p id="joinMsg">Tap Join to enter the room, then pick your character, vehicle and course vote.</p>
+    <button id="joinBtn" class="join">Join</button>
+    <p id="httpsHint" class="httpsHint" hidden>Tilt steering needs the secure link:<br><a id="httpsLink" href="#"></a></p>
+  </div>
+</div>
+
+<section id="lobby" class="lobby" hidden>
+  <header class="lobbyHead">
+    <h2>Lobby</h2>
+    <div id="lobbyMsg" class="lobbyMsg"></div>
+    <button id="inviteBtn" class="inviteBtn" type="button">Invite</button>
+  </header>
+  <div class="lobbyBody">
+    <div class="lobbyCol">
+      <div class="panel">
+        <label class="fieldLabel" for="nameIn">Name (10 characters max)</label>
+        <input id="nameIn" class="nameIn" type="text" maxlength="10" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Your name">
+      </div>
+      <div class="panel">
+        <h3>Character</h3>
+        <div id="charGrid" class="tileGrid"></div>
+      </div>
+      <div class="panel">
+        <h3>Vehicle</h3>
+        <div id="vehGrid" class="tileGrid"></div>
+      </div>
+      <div class="panel">
+        <h3>Drift</h3>
+        <div class="seg">
+          <button id="driftAuto" class="seg1" data-drift="auto">AUTO</button>
+          <button id="driftManual" class="seg1" data-drift="manual">MANUAL</button>
+        </div>
+      </div>
+    </div>
+    <div class="lobbyCol">
+      <div class="panel">
+        <h3>Course vote</h3>
+        <div id="cupTabs" class="tabs"></div>
+        <div id="courseGrid" class="tileGrid"></div>
+      </div>
+      <div class="panel">
+        <h3>Players</h3>
+        <ul id="playerList" class="players"></ul>
+      </div>
+      <div class="readyRow">
+        <button id="readyBtn" class="ready">READY</button>
+        <button id="startBtn" class="startBtn" hidden>START</button>
+      </div>
+      <div id="lobbyHint" class="hint"></div>
+    </div>
+  </div>
+</section>
+
+<section id="starting" class="starting" hidden>
+  <div class="card">
+    <h1>Get ready</h1>
+    <p>Rotate your phone sideways.</p>
+    <p id="startStatus" class="startStatus"></p>
+    <p id="startMsg" class="startMsg"></p>
+  </div>
+</section>
+
+<section id="waiting" class="starting" hidden>
+  <div class="card">
+    <h1 id="waitTitle">Waiting for the next round</h1>
+    <p id="waitMsg"></p>
+  </div>
+</section>
+
+<div id="controls" class="controls" hidden>
+  <div id="left" class="zone left">
+    <div id="steer" class="steer">
+      <div id="steerStrip" class="steerStrip"><div id="steerKnob" class="steerKnob"></div></div>
+      <div class="steerRow">
+        <button id="steerToggle" class="sm">STEER</button>
+        <button id="recentre" class="sm">CENTRE</button>
+        <button id="sensBtn" class="sm">SENS</button>
+      </div>
+    </div>
+    <div class="row">
+      <button class="btn item" data-bit="64">ITEM</button>
+      <button class="btn trick" data-bit="256">TRICK</button>
+    </div>
+    <div class="row small">
+      <button class="sm" data-bit="32">START</button>
+      <button id="menuToggle" class="sm">MENU</button>
+    </div>
+    <div id="menuPad" class="menuPad" hidden>
+      <button id="lobbyBtn" class="sm lobbyBtn" hidden>LOBBY</button>
+      <button class="dp dpUp" data-bit="256">&#9650;</button>
+      <button class="dp dpLeft" data-bit="1024">&#9664;</button>
+      <button class="dp dpRight" data-bit="2048">&#9654;</button>
+      <button class="dp dpDown" data-bit="512">&#9660;</button>
+      <button class="sm mA" data-bit="1">A</button>
+      <button class="sm mB" data-bit="2">B</button>
+    </div>
+  </div>
+
+  <div id="right" class="zone right">
+    <div class="row">
+      <button class="btn brake" data-bit="2">BRAKE</button>
+      <button class="btn drift" data-bit="128">DRIFT</button>
+    </div>
+    <button class="btn accel" data-bit="1">ACCEL</button>
+  </div>
+</div>
+
+<!-- Next-race vote: shown over the live video while the navigator has the vote open. -->
+<section id="voteOverlay" class="voteOverlay" aria-label="Vote for the next race" hidden>
+  <div class="votePanel">
+    <div class="voteLeft">
+      <h2 class="voteTitle">Vote for the next race</h2>
+      <div id="voteCountdown" class="voteCountdown" hidden></div>
+      <button id="voteRandom" class="voteRandom" type="button">Random</button>
+      <button id="voteLock" class="voteLock" type="button">Lock in</button>
+      <div id="voteStatus" class="voteStatus"></div>
+      <button id="voteChange" class="voteChange" type="button" hidden>Change vote</button>
+    </div>
+    <div class="voteRight">
+      <div id="voteTabs" class="voteTabs"></div>
+      <div id="voteCourses" class="voteCourses"></div>
+    </div>
+  </div>
+</section>
+
+<div id="invite" class="invite" hidden>
+  <div class="inviteCard">
+    <h2>Invite a friend</h2>
+    <img id="inviteQr" class="inviteQr" alt="QR code for the party web address" hidden>
+    <div id="inviteUrl" class="inviteUrl"></div>
+    <div id="inviteNone" class="inviteOthers" hidden>No network address found. Connect this phone and the Mac to the same Wi-Fi.</div>
+    <div id="inviteOthers" class="inviteOthers"></div>
+    <p id="inviteNote" class="inviteNote">Scan with a phone camera. On the warning page tap Show details &rarr; visit this website (iPhone) / Advanced &rarr; Proceed (Android)</p>
+    <button id="inviteClose" class="inviteClose" type="button">Close</button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

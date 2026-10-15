@@ -1,0 +1,772 @@
+{
+ "characters": [
+  {
+   "id": "baby-mario",
+   "name": "Baby Mario",
+   "weight": "light",
+   "unlocked": true,
+   "grid": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "baby-luigi",
+   "name": "Baby Luigi",
+   "weight": "light",
+   "unlocked": false
+  },
+  {
+   "id": "baby-peach",
+   "name": "Baby Peach",
+   "weight": "light",
+   "unlocked": true,
+   "grid": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "baby-daisy",
+   "name": "Baby Daisy",
+   "weight": "light",
+   "unlocked": false
+  },
+  {
+   "id": "toad",
+   "name": "Toad",
+   "weight": "light",
+   "unlocked": true,
+   "grid": [
+    1,
+    0
+   ]
+  },
+  {
+   "id": "koopa-troopa",
+   "name": "Koopa Troopa",
+   "weight": "light",
+   "unlocked": true,
+   "grid": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": "dry-bones",
+   "name": "Dry Bones",
+   "weight": "light",
+   "unlocked": false
+  },
+  {
+   "id": "diddy-kong",
+   "name": "Diddy Kong",
+   "weight": "light",
+   "unlocked": false
+  },
+  {
+   "id": "mario",
+   "name": "Mario",
+   "weight": "medium",
+   "unlocked": true,
+   "grid": [
+    2,
+    0
+   ]
+  },
+  {
+   "id": "luigi",
+   "name": "Luigi",
+   "weight": "medium",
+   "unlocked": true,
+   "grid": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": "peach",
+   "name": "Peach",
+   "weight": "medium",
+   "unlocked": true,
+   "grid": [
+    3,
+    1
+   ]
+  },
+  {
+   "id": "daisy",
+   "name": "Daisy",
+   "weight": "medium",
+   "unlocked": false
+  },
+  {
+   "id": "yoshi",
+   "name": "Yoshi",
+   "weight": "medium",
+   "unlocked": true,
+   "grid": [
+    3,
+    0
+   ]
+  },
+  {
+   "id": "birdo",
+   "name": "Birdo",
+   "weight": "medium",
+   "unlocked": false
+  },
+  {
+   "id": "bowser-jr",
+   "name": "Bowser Jr.",
+   "weight": "medium",
+   "unlocked": false
+  },
+  {
+   "id": "rosalina",
+   "name": "Rosalina",
+   "weight": "medium",
+   "unlocked": false
+  },
+  {
+   "id": "wario",
+   "name": "Wario",
+   "weight": "heavy",
+   "unlocked": true,
+   "grid": [
+    4,
+    0
+   ]
+  },
+  {
+   "id": "donkey-kong",
+   "name": "Donkey Kong",
+   "weight": "heavy",
+   "unlocked": true,
+   "grid": [
+    5,
+    0
+   ]
+  },
+  {
+   "id": "bowser",
+   "name": "Bowser",
+   "weight": "heavy",
+   "unlocked": true,
+   "grid": [
+    5,
+    1
+   ]
+  },
+  {
+   "id": "waluigi",
+   "name": "Waluigi",
+   "weight": "heavy",
+   "unlocked": true,
+   "grid": [
+    4,
+    1
+   ]
+  },
+  {
+   "id": "dry-bowser",
+   "name": "Dry Bowser",
+   "weight": "heavy",
+   "unlocked": false
+  },
+  {
+   "id": "funky-kong",
+   "name": "Funky Kong",
+   "weight": "heavy",
+   "unlocked": false
+  },
+  {
+   "id": "metal-mario",
+   "name": "Metal Mario",
+   "weight": "heavy",
+   "unlocked": false
+  },
+  {
+   "id": "pink-gold-peach",
+   "name": "Pink Gold Peach",
+   "weight": "heavy",
+   "unlocked": false
+  }
+ ],
+ "vehicles": [
+  {
+   "id": "standard-kart-s",
+   "name": "Standard Kart S",
+   "weight": "light",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "booster-seat",
+   "name": "Booster Seat",
+   "weight": "light",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    1,
+    0
+   ]
+  },
+  {
+   "id": "mini-beast",
+   "name": "Mini Beast",
+   "weight": "light",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    2,
+    0
+   ]
+  },
+  {
+   "id": "cheep-charger",
+   "name": "Cheep Charger",
+   "weight": "light",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "tiny-titan",
+   "name": "Tiny Titan",
+   "weight": "light",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "super-blooper",
+   "name": "Super Blooper",
+   "weight": "light",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "standard-bike-s",
+   "name": "Standard Bike S",
+   "weight": "light",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "bullet-bike",
+   "name": "Bullet Bike",
+   "weight": "light",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": "mach-bike",
+   "name": "Mach Bike",
+   "weight": "medium",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": "bit-bike",
+   "name": "Bit Bike",
+   "weight": "light",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": "sugarscoot",
+   "name": "Sugarscoot",
+   "weight": "medium",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": "quacker",
+   "name": "Quacker",
+   "weight": "light",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "standard-kart-m",
+   "name": "Standard Kart M",
+   "weight": "medium",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "classic-dragster",
+   "name": "Classic Dragster",
+   "weight": "medium",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    1,
+    0
+   ]
+  },
+  {
+   "id": "wild-wing",
+   "name": "Wild Wing",
+   "weight": "medium",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    2,
+    0
+   ]
+  },
+  {
+   "id": "flame-flyer",
+   "name": "Flame Flyer",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    2,
+    0
+   ]
+  },
+  {
+   "id": "piranha-prowler",
+   "name": "Piranha Prowler",
+   "weight": "medium",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "sprinter",
+   "name": "Sprinter",
+   "weight": "medium",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "standard-bike-m",
+   "name": "Standard Bike M",
+   "weight": "medium",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "flame-runner",
+   "name": "Flame Runner",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    1,
+    1
+   ]
+  },
+  {
+   "id": "zip-zip",
+   "name": "Zip Zip",
+   "weight": "medium",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "wario-bike",
+   "name": "Wario Bike",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    2,
+    1
+   ]
+  },
+  {
+   "id": "shooting-star",
+   "name": "Shooting Star",
+   "weight": "medium",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "sneakster",
+   "name": "Sneakster",
+   "weight": "medium",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "standard-kart-l",
+   "name": "Standard Kart L",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    0,
+    0
+   ]
+  },
+  {
+   "id": "offroader",
+   "name": "Offroader",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": true,
+   "grid": [
+    1,
+    0
+   ]
+  },
+  {
+   "id": "daytripper",
+   "name": "Daytripper",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "jetsetter",
+   "name": "Jetsetter",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "blue-falcon",
+   "name": "Blue Falcon",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "honeycoupe",
+   "name": "Honeycoupe",
+   "weight": "heavy",
+   "type": "kart",
+   "unlocked": false
+  },
+  {
+   "id": "standard-bike-l",
+   "name": "Standard Bike L",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": true,
+   "grid": [
+    0,
+    1
+   ]
+  },
+  {
+   "id": "magikruiser",
+   "name": "Magikruiser",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "spear",
+   "name": "Spear",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "jet-bubble",
+   "name": "Jet Bubble",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "dolphin-dasher",
+   "name": "Dolphin Dasher",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": false
+  },
+  {
+   "id": "phantom",
+   "name": "Phantom",
+   "weight": "heavy",
+   "type": "bike",
+   "unlocked": false
+  }
+ ],
+ "cups": [
+  {
+   "id": "mushroom",
+   "name": "Mushroom Cup",
+   "unlocked": true,
+   "grid": [
+    0,
+    0
+   ],
+   "courses": [
+    {
+     "id": "luigi-circuit",
+     "name": "Luigi Circuit",
+     "row": 0
+    },
+    {
+     "id": "moo-moo-meadows",
+     "name": "Moo Moo Meadows",
+     "row": 1
+    },
+    {
+     "id": "mushroom-gorge",
+     "name": "Mushroom Gorge",
+     "row": 2
+    },
+    {
+     "id": "toads-factory",
+     "name": "Toad's Factory",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "flower",
+   "name": "Flower Cup",
+   "unlocked": true,
+   "grid": [
+    0,
+    1
+   ],
+   "courses": [
+    {
+     "id": "mario-circuit",
+     "name": "Mario Circuit",
+     "row": 0
+    },
+    {
+     "id": "coconut-mall",
+     "name": "Coconut Mall",
+     "row": 1
+    },
+    {
+     "id": "dk-summit",
+     "name": "DK Summit",
+     "row": 2
+    },
+    {
+     "id": "warios-gold-mine",
+     "name": "Wario's Gold Mine",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "star",
+   "name": "Star Cup",
+   "unlocked": false,
+   "grid": [
+    0,
+    2
+   ],
+   "courses": [
+    {
+     "id": "daisy-circuit",
+     "name": "Daisy Circuit",
+     "row": 0
+    },
+    {
+     "id": "koopa-cape",
+     "name": "Koopa Cape",
+     "row": 1
+    },
+    {
+     "id": "maple-treeway",
+     "name": "Maple Treeway",
+     "row": 2
+    },
+    {
+     "id": "grumble-volcano",
+     "name": "Grumble Volcano",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "special",
+   "name": "Special Cup",
+   "unlocked": false,
+   "grid": [
+    0,
+    3
+   ],
+   "courses": [
+    {
+     "id": "dry-dry-ruins",
+     "name": "Dry Dry Ruins",
+     "row": 0
+    },
+    {
+     "id": "moonview-highway",
+     "name": "Moonview Highway",
+     "row": 1
+    },
+    {
+     "id": "bowsers-castle",
+     "name": "Bowser's Castle",
+     "row": 2
+    },
+    {
+     "id": "rainbow-road",
+     "name": "Rainbow Road",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "shell",
+   "name": "Shell Cup",
+   "unlocked": true,
+   "grid": [
+    1,
+    0
+   ],
+   "courses": [
+    {
+     "id": "gcn-peach-beach",
+     "name": "GCN Peach Beach",
+     "row": 0
+    },
+    {
+     "id": "ds-yoshi-falls",
+     "name": "DS Yoshi Falls",
+     "row": 1
+    },
+    {
+     "id": "snes-ghost-valley-2",
+     "name": "SNES Ghost Valley 2",
+     "row": 2
+    },
+    {
+     "id": "n64-mario-raceway",
+     "name": "N64 Mario Raceway",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "banana",
+   "name": "Banana Cup",
+   "unlocked": true,
+   "grid": [
+    1,
+    1
+   ],
+   "courses": [
+    {
+     "id": "n64-sherbet-land",
+     "name": "N64 Sherbet Land",
+     "row": 0
+    },
+    {
+     "id": "gba-shy-guy-beach",
+     "name": "GBA Shy Guy Beach",
+     "row": 1
+    },
+    {
+     "id": "ds-delfino-square",
+     "name": "DS Delfino Square",
+     "row": 2
+    },
+    {
+     "id": "gcn-waluigi-stadium",
+     "name": "GCN Waluigi Stadium",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "leaf",
+   "name": "Leaf Cup",
+   "unlocked": false,
+   "grid": [
+    1,
+    2
+   ],
+   "courses": [
+    {
+     "id": "ds-desert-hills",
+     "name": "DS Desert Hills",
+     "row": 0
+    },
+    {
+     "id": "gba-bowser-castle-3",
+     "name": "GBA Bowser Castle 3",
+     "row": 1
+    },
+    {
+     "id": "n64-dks-jungle-parkway",
+     "name": "N64 DK's Jungle Parkway",
+     "row": 2
+    },
+    {
+     "id": "gcn-mario-circuit",
+     "name": "GCN Mario Circuit",
+     "row": 3
+    }
+   ]
+  },
+  {
+   "id": "lightning",
+   "name": "Lightning Cup",
+   "unlocked": false,
+   "grid": [
+    1,
+    3
+   ],
+   "courses": [
+    {
+     "id": "snes-mario-circuit-3",
+     "name": "SNES Mario Circuit 3",
+     "row": 0
+    },
+    {
+     "id": "ds-peach-gardens",
+     "name": "DS Peach Gardens",
+     "row": 1
+    },
+    {
+     "id": "gcn-dk-mountain",
+     "name": "GCN DK Mountain",
+     "row": 2
+    },
+    {
+     "id": "n64-bowsers-castle",
+     "name": "N64 Bowser's Castle",
+     "row": 3
+    }
+   ]
+  }
+ ]
+}

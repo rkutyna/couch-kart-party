@@ -1,0 +1,199 @@
+#!/bin/zsh
+# mkparty — run a Mario Kart Wii phone party on this Mac.
+#
+#   ./mkparty setup [--game PATH] [--dolphin APP] [...]
+#                        once: install everything (setup.sh: prerequisites check, WiiLink
+#                        wfc-server + wfc-patcher-wii with our patches, the game patch, the
+#                        database, partyd and helpers). `./mkparty setup --help` for options.
+#   ./mkparty setup --profiles [k ...] [--force]
+#                        once, after setup: prepare the 12 Dolphin profiles (i1..i6
+#                        single-player, i7..i12 two-player; license, online consent, second
+#                        player). Starts Dolphin; takes about 5 minutes; keep the Mac unlocked.
+#                        Profiles already set up are skipped.
+#   ./mkparty up [--warm N]
+#                        start everything and print the phone URLs. Up to 12 players; the
+#                        player count follows the phones: at Start the navigator brings up
+#                        the games the players need (<= 6: one each, 16:9; 7-12: two-player
+#                        split screen, 4:3). N games (default 3) are kept ready in the lobby.
+#   ./mkparty down       stop everything mkparty started (nothing is left running)
+#   ./mkparty status     what is running, the lobby state, the phone URLs
+#
+# "up" starts the local game server (server/start.sh) and the navigator (nav/nav.py run),
+# which starts the phone server partyd (run/party.sh, http :8000 + https :8443), the
+# Dolphin instances (run/launch.sh) with their capture/streams (run/streams.sh), brings
+# the games online and, when the host presses Start on a phone, drives each game to the
+# race lobby and hands it to the phone(s).
+# Logs: run/logs/ (mkparty.log, nav.log, partyd.log, i<k>.log, stream-i<k>.log) and nav/logs/.
+set -uo pipefail
+ROOT=${0:A:h}
+RUN=$ROOT/run
+source "$RUN/lib.sh"
+NAV_PID=$PID_DIR/nav.pid
+NAV_LOG=$LOG_DIR/nav.log
+MK_LOG=$LOG_DIR/mkparty.log
+mkdir -p "$LOG_DIR" "$PID_DIR"
+
+# detached <cmd...>: runs cmd in a new session, so that Ctrl-C in this terminal (e.g. while
+# `up` waits) does not reach the games, streams, server or navigator. (At 14:17 on
+# 2026-10-14 a Ctrl-C of `mkparty up 3` killed all Dolphins, the ffmpegs and wwfc: they
+# were in the terminal's process group.) Waits for cmd and returns its status.
+detached() {
+  perl -MPOSIX -e 'my $p = fork(); if ($p) { waitpid($p, 0); exit($? >> 8) } POSIX::setsid(); exec @ARGV or exit 127' "$@"
+}
+
+say() { print -r -- "$*"; print -r -- "$(date '+%H:%M:%S') $*" >> "$MK_LOG"; }
+
+nav_running() {
+  local p; p=$(read_pid nav)
+  pid_alive "$p" && proc_is "$p" "nav.py run"
+}
+
+stop_nav() {
+  local p; p=$(read_pid nav)
+  if pid_alive "$p" && proc_is "$p" "nav.py run"; then
+    kill -TERM "$p" 2>/dev/null
+    wait_exit "$p" 10 || kill -KILL "$p" 2>/dev/null
+    say "navigator stopped (pid $p)"
+  fi
+  rm -f "$NAV_PID"
+}
+
+# nav_ready: the navigator that is running NOW (its pid) reported every wanted game at
+# the WFC menu (run/nav-status.json, written by the navigator in the lobby phase).
+nav_ready() {
+  local p; p=$(read_pid nav)
+  python3 -I -c 'import json,sys
+d=json.load(open(sys.argv[1]))
+sys.exit(0 if d.get("pid")==int(sys.argv[2]) and d.get("ready") else 1)' "$RUN/nav-status.json" "$p" 2>/dev/null
+}
+
+lobby_message() {
+  curl -s -m 3 http://127.0.0.1:$PARTY_PORT/api/nav/lobby 2>/dev/null \
+    | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("phase",""), "|", d.get("message",""))' 2>/dev/null
+}
+
+print_urls() {
+  local host="$(scutil --get LocalHostName 2>/dev/null).local"
+  local -a ips=()
+  local i ip
+  # Internet Sharing (bridge100, 192.168.2.1) first, then the other interfaces.
+  for i in bridge100 $(ifconfig -l); do
+    [[ $i == (bridge100|en<->) ]] || continue
+    for ip in ${(f)"$(ifconfig "$i" 2>/dev/null | awk '$1 == "inet" { print $2 }')"}; do
+      [[ -n $ip ]] && (( ${ips[(Ie)$ip]} == 0 )) && ips+=("$ip")
+    done
+  done
+  print -r -- ""
+  print -r -- "Phones: join the same Wi-Fi as this Mac and open one of these (https first: it allows tilt steering)."
+  print -r -- "  The certificate is self-signed: tap 'Show details' / 'Advanced' > 'visit this website' once."
+  for ip in "${ips[@]}"; do print -r -- "  https://$ip:$HTTPS_PORT/"; done
+  print -r -- "  https://$host:$HTTPS_PORT/"
+  for ip in "${ips[@]}"; do print -r -- "  http://$ip:$PARTY_PORT/"; done
+  print -r -- "  http://$host:$PARTY_PORT/"
+  print -r -- "TV / big screen (join QR code + lobby): http://localhost:$PARTY_PORT/tv.html"
+}
+
+# check_installed: Dolphin, the disc image and the parts that ./mkparty setup builds.
+check_installed() {
+  [[ -x $DOLPHIN ]] || { print -u2 "Dolphin is not installed at $DOLPHIN (DOLPHIN_APP in mkparty.conf)"; exit 1; }
+  [[ -n $GAME ]] || { print -u2 "No disc image set: run ./mkparty setup --game /path/to/image.wbfs"; exit 1; }
+  [[ -f $GAME ]] || { print -u2 "The game disc image is missing: $GAME (GAME_IMAGE in mkparty.conf)"; exit 1; }
+  local f
+  for f in "$GECKO_SRC" "$SERVER_DIR/wfc-server/wwfc" "$SERVER_DIR/wfc-server/config.xml" "$PARTYD"; do
+    [[ -e $f ]] || { print -u2 "Not installed yet ($f is missing): run ./mkparty setup"; exit 1; }
+  done
+}
+
+cmd_setup() {
+  if [[ ${1:-} != --profiles ]]; then
+    exec "$ROOT/setup.sh" "$@"
+  fi
+  shift
+  say "== mkparty setup --profiles $*"
+  check_installed
+  nav_running && { print -u2 "a party is running; ./mkparty down first"; exit 1; }
+  detached "$ROOT/server/start.sh" >> "$MK_LOG" 2>&1 || { print -u2 "server/start.sh failed; see $MK_LOG"; exit 1; }
+  (cd "$ROOT/nav" && python3 nav.py setup "$@") 2>&1 | grep --line-buffered -E "setup|READY|FAILED|ERROR|Traceback" | tee -a "$MK_LOG"
+}
+
+cmd_up() {
+  local warm=() t0 k missing=()
+  if [[ ${1:-} == --warm ]]; then
+    [[ ${2:-} == <0-6> ]] || { print -u2 "--warm N: N must be 0..6"; exit 2; }
+    warm=(--warm "$2")
+  elif [[ ${1:-} == <1-12> ]]; then
+    print -r -- "(the player count now follows the phones; '$1' is ignored)"
+  fi
+  say "== mkparty up ${warm[*]}"
+  check_installed
+  for (( k = 1; k <= 12; k++ )); do [[ -f $INST_ROOT/i$k/mkparty-ready ]] || missing+=("i$k"); done
+  if (( ${#missing} )); then
+    print -r -- "Not set up yet: ${missing[*]} (run ./mkparty setup --profiles once). Parties that need them will fail."
+  fi
+  stop_nav
+  say "starting the game server"
+  detached "$ROOT/server/start.sh" >> "$MK_LOG" 2>&1 || { print -u2 "server/start.sh failed; see $MK_LOG"; exit 1; }
+  say "starting the navigator (it starts the games, streams and the phone server); log $NAV_LOG"
+  print -r -- "---- $(date) mkparty up ${warm[*]}" >> "$NAV_LOG"
+  # A partyd that is still running keeps the old "Ready to start." until the new
+  # navigator has checked the games; clear it so the wait below is honest.
+  curl -s -m 2 -X POST -H 'Content-Type: application/json' -d '{"message":"Getting the game ready..."}' \
+    "http://127.0.0.1:$PARTY_PORT/api/nav/update" > /dev/null 2>&1 || true
+  rm -f "$RUN/nav-status.json"
+  (cd "$ROOT/nav" && perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' nohup python3 nav.py run "${warm[@]}" >> "$NAV_LOG" 2>&1 < /dev/null & print -r -- $! > "$NAV_PID")
+  sleep 1
+  trap 'print -r -- ""; print -r -- "(Ctrl-C) The party keeps running in the background. Stop it with: ./mkparty down"; exit 0' INT
+  t0=$SECONDS
+  local ready=0
+  while (( SECONDS - t0 < 300 )); do
+    nav_running || { print -u2 "the navigator stopped; last lines of $NAV_LOG:"; tail -15 "$NAV_LOG" >&2; exit 1; }
+    if nav_ready; then
+      say "the games are online after $(( SECONDS - t0 )) s"
+      ready=1
+      break
+    fi
+    sleep 2
+  done
+  if (( ! ready )); then
+    say "WARNING: the games are not online after 300 s (the navigator keeps trying; see $NAV_LOG)."
+    # Window capture delivers no pictures while the screen is locked, and the navigator
+    # then waits without a word (seen 2026-10-15 01:50-02:00).
+    if ioreg -l -d1 2>/dev/null | grep -q '"CGSSessionScreenIsLocked"=Yes'; then
+      say "WARNING: the Mac's screen is locked: the games' windows cannot be captured. Unlock it."
+    fi
+  fi
+  print_urls
+  print -r -- ""
+  print -r -- "Each player picks a name, character, vehicle and course, and taps Ready; then the host taps Start."
+  print -r -- "Up to 12 players. With more than the ready games, Start takes longer (the extra games boot first)."
+  print -r -- "Stop everything with: ./mkparty down"
+}
+
+cmd_down() {
+  say "== mkparty down"
+  stop_nav
+  "$RUN/down.sh" --force 2>&1 | tee -a "$MK_LOG"
+  "$ROOT/server/stop.sh" >> "$MK_LOG" 2>&1 && say "game server stopped"
+  local left
+  left=$(ps -axo pid=,command= | grep -E "$ROOT/instances/|$ROOT/party/partyd|stream_slot|stream_inst|$ROOT/run/bin/wincap|nav.py (run|setup)|wfc-server/wwfc|bin/postgres -D $ROOT" | grep -v grep)
+  if [[ -n $left ]]; then
+    say "still running:"; print -r -- "$left"
+  else
+    say "nothing left running"
+  fi
+}
+
+cmd_status() {
+  "$RUN/status.sh" 2>/dev/null | grep -v '^{' 
+  if nav_running; then print -r -- "== navigator pid $(read_pid nav) (log $NAV_LOG)"; else print -r -- "== navigator not running"; fi
+  local m; m=$(lobby_message); [[ -n $m ]] && print -r -- "lobby: $m"
+  print_urls
+}
+
+case ${1:-} in
+  setup) shift; cmd_setup "$@" ;;
+  up) shift; cmd_up "$@" ;;
+  down) cmd_down ;;
+  status) cmd_status ;;
+  *) print -u2 "usage: ./mkparty setup [--help] | setup --profiles | up [--warm N] | down | status"; exit 2 ;;
+esac

@@ -1,0 +1,5 @@
+[
+  {"name": "Ann", "character": "bowser", "vehicle": "wario-bike", "drift": "manual", "vote": "random"},
+  {"name": "Ben", "character": "yoshi", "vehicle": "mach-bike", "drift": "auto", "vote": "coconut-mall"},
+  {"name": "Cat", "character": "toad", "vehicle": "bullet-bike", "drift": "manual", "vote": "n64-sherbet-land"}
+]
