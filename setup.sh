@@ -30,9 +30,10 @@
 #   5 server     config.xml with a random database password and API secret, a private
 #                PostgreSQL 16 cluster (server/pgdata, 127.0.0.1:PG_PORT) with the schema,
 #                and the wwfc binary.
-#   6 apps       partyd, fakephones, the window-capture helpers (Swift) and the
+#   6 apps       partyd, fakephones, the window-capture and OCR helpers (Swift) and the
 #                self-signed HTTPS certificate.
 # Afterwards (separately, needs the Mac unlocked, starts Dolphin): ./mkparty setup --profiles
+# (prepares the Dolphin profiles and generates the screen templates from your own game).
 set -uo pipefail
 
 ROOT=${0:A:h}
@@ -240,11 +241,32 @@ fetch_upstream() {
   fi
 }
 
+# mark_altered: WiiLink's licence asks that altered versions of wfc-patcher-wii are plainly
+# marked as such; the patched clone gets a notice file at its top.
+mark_altered() {
+  local f=$PATCHER_DIR/ALTERED-BY-COUCH-KART-PARTY.md
+  [[ -f $f ]] && { ok "wfc-patcher-wii: altered-version notice present"; return; }
+  cat > "$f" <<'MD' || fail "could not write $f"
+# Altered version
+
+This is an altered version of WiiLink's wfc-patcher-wii
+(https://github.com/WiiLink24/wfc-patcher-wii), not the original. It was changed by
+Couch Kart Party's setup, which applied `patches/wfc-patcher-wii.patch` (a "no-DNS" build:
+the online-service host names are replaced by the IP literal 127.0.0.1 and the game's HTTP
+port is 8080) to the upstream commit pinned in `setup.sh`.
+
+The original software and its licence (see LICENSE in this folder) are by WiiLink.
+Credit: WiiLink WFC - https://wfc.wiilink.ca
+MD
+  ok "wfc-patcher-wii: wrote ALTERED-BY-COUCH-KART-PARTY.md (altered-version notice)"
+}
+
 upstreams() {
   step 2 "upstream sources (WiiLink wfc-server, wfc-patcher-wii) + our patches"
   mkdir -p "$ROOT/patcher"
   fetch_upstream wfc-server "$WFC_SERVER_URL" "$WFC_SERVER_COMMIT" "$WFC_DIR" "$ROOT/patches/wfc-server.patch"
   fetch_upstream wfc-patcher-wii "$PATCHER_URL" "$PATCHER_COMMIT" "$PATCHER_DIR" "$ROOT/patches/wfc-patcher-wii.patch"
+  mark_altered
 }
 
 # ------------------------------------------------------------------ 3. toolchain
@@ -449,6 +471,11 @@ apps() {
       || fail "swiftc winlist failed; see $LOG_DIR/setup-swift.log"
     ok "built run/bin/winlist"
   else ok "run/bin/winlist is up to date"; fi
+  if newer_than "$ROOT/run/bin/ocr" "$ROOT/run/src/ocr.swift"; then
+    swiftc -O -o "$ROOT/run/bin/ocr" "$ROOT/run/src/ocr.swift" >> "$LOG_DIR/setup-swift.log" 2>&1 \
+      || fail "swiftc ocr failed; see $LOG_DIR/setup-swift.log"
+    ok "built run/bin/ocr (Vision text recognition, used to generate the screen templates)"
+  else ok "run/bin/ocr is up to date"; fi
   local out; out=$("$p/make-cert.sh" 2>&1) || fail "make-cert.sh failed: $out"
   ok "HTTPS certificate: ${out%%$'\n'*}"
 }
@@ -473,9 +500,14 @@ else print -r -- "setup finished."; fi
 typeset -a ready=( "$ROOT"/instances/i*/mkparty-ready(N) )
 k_ready=${#ready}
 if (( k_ready < 12 )); then
-  print -r -- "Last step (once, about 5 minutes, starts Dolphin; keep the Mac unlocked):"
+  print -r -- "Last step (once, about 25 minutes, starts Dolphin; keep the Mac unlocked):"
   print -r -- "  ./mkparty setup --profiles"
   print -r -- "Give the terminal Screen Recording permission (System Settings > Privacy & Security) when macOS asks."
 else
-  print -r -- "All 12 Dolphin profiles are set up. Start a party with: ./mkparty up"
+  assets=${MKPARTY_ASSETS:-$ROOT/assets}; [[ $assets == /* ]] || assets=$ROOT/$assets
+  if [[ -f $assets/templates.npz && -f $assets/templates43.npz ]] || [[ -z ${MKPARTY_ASSETS:-} && -f $ROOT/nav/templates.npz ]]; then
+    print -r -- "All 12 Dolphin profiles are set up. Start a party with: ./mkparty up"
+  else
+    print -r -- "The profiles are set up but the screen templates are not: run ./mkparty calibrate (about 20 minutes)."
+  fi
 fi

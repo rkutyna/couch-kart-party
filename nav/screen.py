@@ -29,8 +29,10 @@ Button lists (Worldwide/Regional/Friends, VS/Battle, Vote/Random, the course
 list) are read from the label colour: the highlighted label is white, the
 others grey.
 
-Templates are cut from nav/refs (see TEMPLATES) into nav/templates.npz by
-`nav.py build-templates`.
+Templates are cut from captures of the user's own game by `./mkparty calibrate`
+(nav/calibrate.py; see TEMPLATES for what each one is cut from) into
+<assets>/templates.npz (bank_path). Installs from before calibration may instead have
+nav/templates.npz built from hand-labelled nav/refs (`nav.py build-templates`).
 """
 from __future__ import annotations
 
@@ -41,18 +43,33 @@ from dataclasses import dataclass, field
 import numpy as np
 from PIL import Image
 
+import localconf
+
 NAV_DIR = os.path.dirname(os.path.abspath(__file__))
-REFS_DIR = os.path.join(NAV_DIR, "refs")
-BANK_FILE = os.path.join(NAV_DIR, "templates.npz")
+REFS_DIR = os.path.join(NAV_DIR, "refs")          # hand-labelled captures (legacy; not in git)
 
 
-def assets_missing(bank_file: str, refs_dir: str) -> str:
-    """The error for a checkout without the game-derived screen templates."""
-    return (f"screen templates missing: {bank_file} (and no {refs_dir}/ to build it from).\n"
-            "The templates are cut from screenshots of the game and are not in the git repository;\n"
-            "they are distributed separately for now. Put templates.npz and templates43.npz in nav/\n"
-            "(see README.md, 'Game assets'), or build them from refs/ + refs43/ with "
-            "`python3 nav/nav.py build-templates`.")
+def bank_path(name: str) -> str:
+    """Where a template bank is read from: the assets folder (MKPARTY_ASSETS, default
+    <root>/assets, filled by `./mkparty calibrate` from the user's own game); without one
+    there, a bank in nav/ (installs from before calibration existed). An explicitly set
+    MKPARTY_ASSETS is always used as it is."""
+    p = os.path.join(localconf.assets_dir(), name)
+    if os.path.exists(p) or localconf.assets_explicit():
+        return p
+    legacy = os.path.join(NAV_DIR, name)
+    return legacy if os.path.exists(legacy) else p
+
+
+BANK_FILE = bank_path("templates.npz")
+
+
+def assets_missing(bank_file: str, refs_dir: str = "") -> str:
+    """The error for an install whose screen templates have not been generated yet."""
+    return (f"screen templates missing: {bank_file}\n"
+            "They are generated on this Mac from your own copy of the game (no game imagery is\n"
+            "distributed): run `./mkparty setup --profiles` (first time) or `./mkparty calibrate`\n"
+            "(see README.md, 'Game assets').")
 CATALOG = os.path.join(os.path.dirname(NAV_DIR), "party", "web", "catalog.json")
 
 FRAME_W, FRAME_H = 1280, 1016
@@ -126,53 +143,61 @@ NEXT_RACE_BOXES = {"next": (500, 245, 780, 305), "quit": (510, 400, 770, 455)}
 VOTE_BOXES = {"vote": (247, 320, 1033, 413), "random": (291, 440, 987, 527)}
 
 # ---------------------------------------------------------------- templates
-# (kind, key, reference file). kind selects the ROI and the comparison; key is
-# what a match means. Several files per key are fine (best score wins).
+# (kind, key, legacy reference file, source spec). kind selects the ROI and the
+# comparison; key is what a match means. Several templates per key are fine (best score
+# wins). The legacy file is a hand-labelled capture in nav/refs (installs from before
+# calibration); the source spec says which screen a capture must show for `./mkparty
+# calibrate` to cut this template from it: (state or states, cursor or None, text or
+# None), text = a phrase the screen shows (OCR, nav/ocrscreen.py). "@dialog" = any game
+# dialog with the (A) icon. A legacy file of None: generated banks only, when seen.
+DIALOG_STATES = ("welcome", "disconnected_dialog", "error_dialog")
 TEMPLATES = [
-    ("title", "main_menu", "mainmenu_1.png"),
-    ("title", "license_select", "title_1.png"),
-    ("title", "characters", "char_select_1.png"),
-    ("title", "characters", "sp_char_05_mario.png"),
-    ("title", "vehicles", "vehicle_select_1.png"),
-    ("title", "drift", "drift_select_1.png"),
-    ("title", "wfc", "wfc_menu_1.png"),
-    ("title", "ww_mode", "ww_mode_1.png"),
-    ("title", "searching", "r2_mm_1.png"),
-    ("title", "check_members", "mm_a_1.png"),
-    ("title", "course_poll", "check_members2_1.png"),
-    ("title", "courses", "pv_after1_3.png"),
-    ("title", "courses", "sp_cups_06_mushroom.png"),
-    ("back", "back", "mainmenu_1.png"),
-    ("back", "back", "sp_char_05_mario.png"),
-    ("aicon", "a", "r2_a_1.png"),
-    ("aicon", "a", "r2_a_3.png"),          # the icon pulses in size
-    ("t_health", "health", "boot_health_1.png"),
-    ("t_title", "title", "title_2.png"),
-    ("t_welcome", "welcome", "wfc_welcome_1.png"),
-    ("t_disconnected", "disconnected", "race_b_1.png"),
-    ("t_vote", "vote", "pv_vote3_i1_A_1.png"),
-    ("t_connecting", "connecting", "r2_c_1.png"),
-    ("t_preparing", "preparing", "pv_vote1_1.png"),
-    ("t_emu", "emu", "pv_after1_2.png"),
-    ("t_pleasewait", "pleasewait", "please_wait_1.png"),
-    ("t_nextrace", "nextrace", "next_race_menu_1.png"),
-    ("t_results", "results", "results_1.png"),
-    ("hint", "main_menu:single", "mainmenu_1.png"),
-    ("hint", "main_menu:wfc", "after_dc_1.png"),
-    ("hint", "main_menu:wfc2", "mm_wfc2.png"),
-    ("hint", "main_menu:multi", "mm_multi2.png"),
-    ("hint", "main_menu:multi", "mm_multi4.png"),
-    ("hint", "main_menu:channel", "mm_channel.png"),
-    ("hint", "main_menu:license", "mm_license.png"),
-    ("hint", "drift:auto", "drift_select_1.png"),
-    ("hint", "drift:manual", "sp_drift_00_manual.png"),
-    ("hint", "drift:help", "sp_drift_02_help.png"),
-    ("hint", "wfc_menu:worldwide", "wfc_menu_1.png"),
-    ("hint", "ww_mode:vs", "ww_mode_1.png"),
-    ("hint", "course_poll:waiting", "check_members2_1.png"),
-    ("hint", "course_poll:selected", "vote_cups_moved_1.png"),
+    ("title", "main_menu", "mainmenu_1.png", ("main_menu", None, None)),
+    ("title", "license_select", "title_1.png", ("license_select", None, None)),
+    ("title", "characters", "char_select_1.png", ("characters", None, None)),
+    ("title", "characters", "sp_char_05_mario.png", ("characters", None, None)),
+    ("title", "vehicles", "vehicle_select_1.png", ("vehicles", None, None)),
+    ("title", "drift", "drift_select_1.png", ("drift", None, None)),
+    ("title", "wfc", "wfc_menu_1.png", (("wfc_menu", "connecting"), None, None)),
+    ("title", "ww_mode", "ww_mode_1.png", ("ww_mode", None, None)),
+    ("title", "searching", "r2_mm_1.png", ("searching", None, None)),
+    ("title", "check_members", "mm_a_1.png", ("check_members", None, None)),
+    ("title", "course_poll", "check_members2_1.png", ("course_poll", None, None)),
+    ("title", "courses", "pv_after1_3.png", (("courses_cups", "courses_list"), None, None)),
+    ("title", "courses", "sp_cups_06_mushroom.png", (("courses_cups", "courses_list"), None, None)),
+    ("back", "back", "mainmenu_1.png", ("main_menu", None, None)),
+    ("back", "back", "sp_char_05_mario.png", ("characters", None, None)),
+    ("aicon", "a", "r2_a_1.png", ("@dialog", None, None)),
+    ("aicon", "a", "r2_a_3.png", ("@dialog", None, None)),   # the icon pulses in size
+    ("t_health", "health", "boot_health_1.png", ("health", None, None)),
+    ("t_title", "title", "title_2.png", ("title", None, None)),
+    ("t_welcome", "welcome", "wfc_welcome_1.png", ("welcome", None, None)),
+    ("t_disconnected", "disconnected", "race_b_1.png", ("disconnected_dialog", None, None)),
+    ("t_vote", "vote", "pv_vote3_i1_A_1.png", ("vote_prompt", None, None)),
+    ("t_connecting", "connecting", "r2_c_1.png", ("connecting", None, None)),
+    ("t_preparing", "preparing", "pv_vote1_1.png", ("preparing", None, None)),
+    ("t_pleasewait", "pleasewait", "please_wait_1.png", ("please_wait", None, None)),
+    ("t_nextrace", "nextrace", "next_race_menu_1.png", ("next_race_menu", "next", None)),
+    ("t_results", "results", "results_1.png", ("results", None, None)),
+    ("hint", "main_menu:single", "mainmenu_1.png", ("main_menu", "single", None)),
+    ("hint", "main_menu:wfc", "after_dc_1.png", ("main_menu", "wfc", None)),
+    ("hint", "main_menu:wfc2", "mm_wfc2.png", ("main_menu", "wfc2", None)),
+    ("hint", "main_menu:multi", "mm_multi2.png", ("main_menu", "multi", "two players")),
+    ("hint", "main_menu:multi", "mm_multi4.png", ("main_menu", "multi", "four players")),
+    ("hint", "main_menu:multi", None, ("main_menu", "multi", "three players")),
+    ("hint", "main_menu:channel", "mm_channel.png", ("main_menu", "channel", None)),
+    ("hint", "main_menu:license", "mm_license.png", ("main_menu", "license", None)),
+    ("hint", "drift:auto", "drift_select_1.png", ("drift", "auto", None)),
+    ("hint", "drift:manual", "sp_drift_00_manual.png", ("drift", "manual", None)),
+    ("hint", "drift:help", "sp_drift_02_help.png", ("drift", "help", None)),
+    ("hint", "wfc_menu:worldwide", "wfc_menu_1.png", ("wfc_menu", "worldwide", None)),
+    ("hint", "ww_mode:vs", "ww_mode_1.png", ("ww_mode", "vs", None)),
+    ("hint", "course_poll:waiting", "check_members2_1.png", ("course_poll", None, "waiting for everyone")),
+    ("hint", "course_poll:selected", "vote_cups_moved_1.png", ("course_poll", None, "has been selected")),
 ]
-# Character / vehicle name labels and cup labels: one reference per catalog id.
+# Character / vehicle name labels and cup labels: one reference per catalog id (the
+# source spec: characters / vehicles / courses_cups with that cursor; courses_list of
+# that cup).
 NAME_REFS = {
     "charname": {
         "yoshi": "sp_char_00_yoshi.png", "wario": "sp_char_01_wario.png",
@@ -335,21 +360,38 @@ def _roi_for(kind, key):
     return ROIS[kind]
 
 
-def build_bank(refs_dir: str = REFS_DIR, out: str = BANK_FILE) -> int:
-    entries = list(TEMPLATES)
+def use_bank(path: str):
+    """Read templates from this bank file from now on (calibration, tests)."""
+    global BANK_FILE, _bank
+    BANK_FILE = path
+    _bank = None
+
+
+def legacy_entries():
+    """[(kind, key, file, roi)] of the bank built from the hand-labelled nav/refs."""
+    out = [(k, key, f, _roi_for(k, key)) for k, key, f, _spec in TEMPLATES if f]
     for kind, d in NAME_REFS.items():
         for key, f in d.items():
-            entries.append((kind, key, f))
+            out.append((kind, key, f, _roi_for(kind, key)))
+    return out
+
+
+def build_bank(refs_dir: str = REFS_DIR, out: str | None = None, entries=None) -> int:
+    """Cut the templates [(kind, key, capture file in refs_dir, roi)] (default: the legacy
+    entries from nav/refs) and write them to `out` (default: the bank in use)."""
+    out = out or BANK_FILE
+    entries = legacy_entries() if entries is None else entries
     arrays, meta = {}, []
     cache = {}
-    for i, e in enumerate(entries):
-        kind, key, f = e[:3]
+    for i, (kind, key, f, roi) in enumerate(entries):
         if f not in cache:
             cache[f] = picture_of(load_frame(os.path.join(refs_dir, f)))
-        roi = _roi_for(kind, key)
         arrays[f"t{i}"] = _feat(cache[f], roi, kind).astype(np.float32)
-        meta.append({"kind": kind, "key": key, "src": f, "roi": list(roi)})
-    np.savez_compressed(out, meta=json.dumps(meta), **arrays)
+        meta.append({"kind": kind, "key": key, "src": os.path.basename(f), "roi": list(roi)})
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    tmp = out + ".tmp.npz"
+    np.savez_compressed(tmp, meta=json.dumps(meta), **arrays)
+    os.replace(tmp, out)
     global _bank
     _bank = None
     return len(entries)
@@ -359,9 +401,7 @@ def bank() -> dict:
     global _bank
     if _bank is None:
         if not os.path.exists(BANK_FILE):
-            if not os.path.isdir(REFS_DIR):
-                raise SystemExit(assets_missing(BANK_FILE, REFS_DIR))
-            build_bank()
+            raise SystemExit(assets_missing(BANK_FILE))
         z = np.load(BANK_FILE, allow_pickle=False)
         meta = json.loads(str(z["meta"]))
         b = {}
@@ -489,12 +529,25 @@ def has_chrome(pic) -> bool:
 
 
 # ---------------------------------------------------------------- classify
+def emu_sheet(frame: np.ndarray) -> bool:
+    """Dolphin's own alert sheet ("Invalid read from ...": macOS interface, not the game's
+    picture) over the window: its yellow warning triangle next to a plain panel."""
+    tri = frame[370:485, 270:395].astype(np.int16)
+    yel = int(((tri[..., 0] > 200) & (tri[..., 1] > 150) & (tri[..., 2] < 80)).sum())
+    if yel < 3000:
+        return False
+    return float(frame[340:360, 240:1040].astype(np.float32).std()) < 4.0
+
+
 def classify_frame(frame: np.ndarray) -> Result:
     """Classify a full window capture (checks the capture geometry first)."""
     if frame.shape[:2] != (FRAME_H, FRAME_W):
         return Result("unknown", 0.0, how=f"bad-frame-size {frame.shape[1]}x{frame.shape[0]}")
     pic = picture_of(frame)
-    # The emulator alert sheet hangs over the letterbox, so it is checked first.
+    # The emulator alert sheet hangs over the letterbox, so it is checked first (by its
+    # shape; banks built before 2026-10-16 also carry a text template of it).
+    if emu_sheet(frame):
+        return Result("emu_alert", 1.0, how="emu-sheet")
     emu = scores(pic, "t_emu").get("emu", 0.0)
     if emu >= THR_TEXT:
         return Result("emu_alert", emu, how="emu-text")

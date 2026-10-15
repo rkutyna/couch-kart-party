@@ -18,15 +18,21 @@ def norm(c):
     return tuple(c) if isinstance(c, list) else c
 
 
-def run(verbose: bool = False) -> int:
+def run(verbose: bool = False, refs: str | None = None, labels: str | None = None,
+        refs43: str | None = None, labels43: str | None = None) -> int:
+    """Classify every labelled capture with the bank in use (screen.BANK_FILE,
+    screen43.BANK_FILE). Default captures: the hand-labelled nav/refs + labels.json and
+    nav/refs43 + labels43.json; calibration passes its own (<assets>/captures + labels)."""
     rc = 0
-    for mod, labels in ((screen, LABELS), (screen43, LABELS43)):
-        print(f"== {os.path.basename(labels)} ({mod.__name__})")
-        rc |= run_one(mod, labels, verbose)
+    for mod, lab, refs_dir in ((screen, labels or LABELS, refs or screen.REFS_DIR),
+                               (screen43, labels43 or LABELS43, refs43 or screen43.REFS_DIR)):
+        print(f"== {lab} ({mod.__name__}, bank {mod.BANK_FILE})")
+        rc |= run_one(mod, lab, verbose, refs_dir)
     return rc
 
 
-def run_one(screen, LABELS, verbose: bool = False) -> int:
+def run_one(screen, LABELS, verbose: bool = False, refs_dir: str | None = None) -> int:
+    refs_dir = refs_dir or screen.REFS_DIR
     with open(LABELS) as f:
         labels = json.load(f)["labels"]
     conf, wrong, cur_wrong, times = {}, [], [], []
@@ -34,7 +40,7 @@ def run_one(screen, LABELS, verbose: bool = False) -> int:
     ncur = 0
     for name in sorted(labels):
         want = labels[name]
-        path = os.path.join(screen.REFS_DIR, name)
+        path = os.path.join(refs_dir, name)
         if not os.path.exists(path):
             wrong.append((name, want["state"], "MISSING FILE", ""))
             continue

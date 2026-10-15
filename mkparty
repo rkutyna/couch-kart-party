@@ -9,7 +9,13 @@
 #                        once, after setup: prepare the 12 Dolphin profiles (i1..i6
 #                        single-player, i7..i12 two-player; license, online consent, second
 #                        player). Starts Dolphin; takes about 5 minutes; keep the Mac unlocked.
-#                        Profiles already set up are skipped.
+#                        Profiles already set up are skipped. Then, if there are no screen
+#                        templates yet, runs `calibrate` (below).
+#   ./mkparty calibrate  generate the navigator's screen templates (and the test phones'
+#                        minimap icons) on this Mac from your own copy of the game: the
+#                        screens are read with Apple's Vision OCR, captured and cut into
+#                        templates in assets/ (MKPARTY_ASSETS). About 20 minutes; starts
+#                        Dolphin (silent). No game imagery is ever distributed with mkparty.
 #   ./mkparty up [--warm N]
 #                        start everything and print the phone URLs. Up to 12 players; the
 #                        player count follows the phones: at Start the navigator brings up
@@ -114,6 +120,41 @@ cmd_setup() {
   nav_running && { print -u2 "a party is running; ./mkparty down first"; exit 1; }
   detached "$ROOT/server/start.sh" >> "$MK_LOG" 2>&1 || { print -u2 "server/start.sh failed; see $MK_LOG"; exit 1; }
   (cd "$ROOT/nav" && python3 nav.py setup "$@") 2>&1 | grep --line-buffered -E "setup|READY|FAILED|ERROR|Traceback" | tee -a "$MK_LOG"
+  # The screen templates are generated from this Mac's own game (nothing game-derived is
+  # distributed): once the profiles are ready, if there are none yet.
+  if ! templates_present; then
+    if [[ -f $INST_ROOT/i1/mkparty-ready && -f $INST_ROOT/i7/mkparty-ready ]]; then
+      cmd_calibrate --keep
+    else
+      say "the screen templates are not generated yet: profiles i1 and i7 must be set up first (see above)"
+    fi
+  fi
+}
+
+# templates_present: both screen-template banks exist where the navigator reads them.
+templates_present() {
+  python3 -I - "$ROOT/nav" <<'PY' 2>/dev/null
+import os, sys
+sys.path.insert(0, sys.argv[1])
+import screen, screen43
+sys.exit(0 if os.path.exists(screen.BANK_FILE) and os.path.exists(screen43.BANK_FILE) else 1)
+PY
+}
+
+cmd_calibrate() {
+  say "== mkparty calibrate $*"
+  check_installed
+  nav_running && { print -u2 "a party is running; ./mkparty down first"; exit 1; }
+  for k in 1 7; do
+    [[ -f $INST_ROOT/i$k/mkparty-ready ]] || { print -u2 "profile i$k is not set up: run ./mkparty setup --profiles"; exit 1; }
+  done
+  say "generating the screen templates from your game (about 20 minutes; Dolphin windows appear, the games stay silent; keep the Mac unlocked)"
+  (cd "$ROOT/nav" && NAV_TV_AUDIO=0 python3 nav.py calibrate "$@") 2>&1 \
+    | grep --line-buffered -E "cal|labelled captures|cursor correct|MISSING|WRONG|CURSOR|Traceback|Error" | tee -a "$MK_LOG"
+  local rc=${pipestatus[1]}
+  if (( rc == 0 )); then say "calibration finished: the screen templates are ready"
+  else say "calibration did not finish cleanly (see above and nav/logs/nav-calibrate-*.log); run ./mkparty calibrate again"; fi
+  return $rc
 }
 
 cmd_up() {
@@ -126,6 +167,7 @@ cmd_up() {
   fi
   say "== mkparty up ${warm[*]}"
   check_installed
+  templates_present || { print -u2 "The screen templates are not generated yet: run ./mkparty calibrate (or ./mkparty setup --profiles)."; exit 1; }
   for (( k = 1; k <= 12; k++ )); do [[ -f $INST_ROOT/i$k/mkparty-ready ]] || missing+=("i$k"); done
   if (( ${#missing} )); then
     print -r -- "Not set up yet: ${missing[*]} (run ./mkparty setup --profiles once). Parties that need them will fail."
@@ -194,8 +236,9 @@ cmd_status() {
 
 case ${1:-} in
   setup) shift; cmd_setup "$@" ;;
+  calibrate) shift; cmd_calibrate "$@" ;;
   up) shift; cmd_up "$@" ;;
   down) cmd_down ;;
   status) cmd_status ;;
-  *) print -u2 "usage: ./mkparty setup [--help] | setup --profiles | up [--warm N] | down | status"; exit 2 ;;
+  *) print -u2 "usage: ./mkparty setup [--help] | setup --profiles | calibrate | up [--warm N] | down | status"; exit 2 ;;
 esac

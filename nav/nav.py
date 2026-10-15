@@ -2,8 +2,13 @@
 """Navigator: drives Mario Kart Wii (RMCE01) Dolphin instances through the online menus.
 
 usage (paths are derived from this file):
-  nav.py test [-v]                 offline classifier test over nav/refs + nav/labels.json
-  nav.py build-templates           rebuild nav/templates.npz from nav/refs
+  nav.py test [-v] [--refs DIR]    offline classifier test of the screen templates in use over
+                                   labelled captures (nav/refs + labels*.json, or an assets folder)
+  nav.py calibrate                 generate the screen templates (and test-phone icons) from
+                                   this Mac's own game into the assets folder (./mkparty calibrate)
+  nav.py build-templates [--legacy]
+                                   rebuild the banks from the calibration captures (--legacy: from
+                                   hand-labelled nav/refs into nav/templates*.npz)
   nav.py classify <png> [...]      state / cursor of capture files
   nav.py watch --players N [--seconds S]
                                    print every instance's screen (no input is sent)
@@ -242,21 +247,72 @@ def ensure_infrastructure(n: int, streams: bool = True, party: bool = True):
 
 
 # ------------------------------------------------------------------ commands
+def test_sets(refs: str | None):
+    """(refs, labels, refs43, labels43) of the labelled captures to test against: a folder
+    with refs/, refs43/, labels.json, labels43.json (hand-labelled, e.g. nav/), or an assets
+    folder with captures/ + labels*.json (made by calibrate). Default: nav/ when it has the
+    hand-labelled set, else the assets folder."""
+    import localconf
+    if refs is None:
+        refs = NAV_DIR if os.path.exists(os.path.join(NAV_DIR, "labels.json")) else localconf.assets_dir()
+    if os.path.isdir(os.path.join(refs, "captures")):
+        cap = os.path.join(refs, "captures")
+        return cap, os.path.join(refs, "labels.json"), cap, os.path.join(refs, "labels43.json")
+    return (os.path.join(refs, "refs"), os.path.join(refs, "labels.json"),
+            os.path.join(refs, "refs43"), os.path.join(refs, "labels43.json"))
+
+
 def cmd_test(a):
     import offline_test
-    for d in (screen.REFS_DIR, screen43.REFS_DIR, offline_test.LABELS, offline_test.LABELS43):
+    sets = test_sets(a.refs)
+    for d in sets + (screen.BANK_FILE, screen43.BANK_FILE):
         if not os.path.exists(d):
-            raise SystemExit(f"{d} is missing: the offline test needs the labelled screenshots, which "
-                             "are not in the git repository (see README.md, 'Game assets').")
-    return offline_test.run(verbose=a.verbose)
+            raise SystemExit(f"{d} is missing: the offline test needs screen templates and labelled captures "
+                             "(./mkparty calibrate makes both; see README.md, 'Game assets').")
+    return offline_test.run(verbose=a.verbose, refs=sets[0], labels=sets[1], refs43=sets[2], labels43=sets[3])
 
 
-def cmd_build(_a):
-    for d in (screen.REFS_DIR, screen43.REFS_DIR):
-        if not os.path.isdir(d):
-            raise SystemExit(f"{d} is missing (see README.md, 'Game assets').")
-    print(f"wrote {screen.build_bank()} templates to {screen.BANK_FILE}")
-    return 0
+def cmd_build(a):
+    """Rebuild the banks: from the calibration captures (default), or with --legacy from
+    hand-labelled nav/refs + nav/refs43 into nav/templates*.npz."""
+    if a.legacy:
+        for d in (screen.REFS_DIR, screen43.REFS_DIR):
+            if not os.path.isdir(d):
+                raise SystemExit(f"{d} is missing (see README.md, 'Game assets').")
+        out = os.path.join(NAV_DIR, "templates.npz"), os.path.join(NAV_DIR, "templates43.npz")
+        print(f"wrote {screen.build_bank(out=out[0])} templates to {out[0]}")
+        print(f"wrote {screen43.build_bank(out=out[1])} templates to {out[1]}")
+        return 0
+    import calibrate
+    import localconf
+    assets = localconf.assets_dir()
+    if not os.path.exists(os.path.join(assets, "captures", "index.jsonl")):
+        raise SystemExit(f"no calibration captures in {assets}; run ./mkparty calibrate")
+    s = calibrate.build(assets, print)
+    return 0 if s["selftest_ok"] and not s["missing"] else 1
+
+
+def cmd_calibrate(a):
+    """Generate the game-derived assets from the user's own game (nav/calibrate.py)."""
+    import calibrate
+    import localconf
+    if pidfile_alive("nav"):
+        raise SystemExit("a party is running (./mkparty down first)")
+    for k in (1, 7, calibrate.SCRATCH_K):
+        if dolphin.Instance(k).alive() and not a.adopt:
+            raise SystemExit(f"instance {k} is running; stop it first (./mkparty down)")
+    if not driver.profile_ready(1) or not driver.profile_ready(7):
+        raise SystemExit("profiles i1 and i7 must be set up first: ./mkparty setup --profiles")
+    assets = localconf.assets_dir()
+    os.makedirs(assets, exist_ok=True)
+    run_id, log = new_run("calibrate")
+    started = not listening(8080)
+    ensure_server()
+    try:
+        return calibrate.run(assets, log, rounds=a.rounds, keep=a.keep, firstboot=not a.no_firstboot)
+    finally:
+        if started and not a.keep_server:
+            sh(os.path.join(ROOT, "server", "stop.sh"), check=False)
 
 
 def cmd_classify(a):
@@ -346,7 +402,19 @@ def cmd_setup(a):
         return 0
     ensure_server()
     run_id, log = new_run("setup")
-    log(f"setup: profiles {ks}, {a.parallel} at a time")
+    # Without screen templates (a new install) the screens are read with OCR, and the
+    # first-boot screens are kept for the calibration that follows (./mkparty setup --profiles).
+    import calibrate
+    import localconf
+    ocr = a.ocr or not (os.path.exists(screen.BANK_FILE) and os.path.exists(screen43.BANK_FILE))
+    col = None
+    if ocr:
+        import ocrscreen
+        col = calibrate.Collector(localconf.assets_dir(), log)
+        ocrscreen.warm_up(log)
+    log(f"setup: profiles {ks}, {a.parallel} at a time; screens read with "
+        f"{'OCR (no templates yet; first-boot screens are captured for calibration)' if ocr else 'templates'}")
+    explored = False
     bad = []
     for i in range(0, len(ks), a.parallel):
         batch = ks[i:i + a.parallel]
@@ -354,7 +422,16 @@ def cmd_setup(a):
             if dolphin.Instance(k).alive():
                 raise SystemExit(f"instance {k} is running; stop it first (./mkparty down)")
         ensure_instances(batch, setup=True)
-        r = driver.Runner(batch, log, run_id, setup=True)
+        r = driver.Runner(batch, log, run_id, setup=True,
+                          classifier_factory=calibrate.ocr_factory(True) if ocr else None,
+                          collector=col.worker_hook if col else None)
+        if col is not None:
+            for w in r.workers.values():
+                w.linger = dict(calibrate.LINGER)
+            if not explored:
+                # one profile shows "You will not be able to play ..." (Prohibit, then No)
+                next(iter(r.workers.values())).explore_wont_play = True
+                explored = True
         r.start()
         ok = r.prepare(a.timeout)
         r.stop()
@@ -373,6 +450,8 @@ def cmd_setup(a):
             sh(os.path.join(RUN, "streams.sh"), "stop", str(k), check=False)
         if not ok:
             log(f"setup: batch {batch} did not finish: {r.summary()}")
+    if col is not None:
+        col.flush()
     log(f"setup finished: ready {[k for k in range(1, 13) if driver.profile_ready(k)]}, failed {bad}")
     return 1 if bad else 0
 
@@ -418,8 +497,19 @@ def cmd_shot(a):
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("test"); p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_test)
-    sub.add_parser("build-templates").set_defaults(fn=cmd_build)
+    p = sub.add_parser("test"); p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--refs", help="labelled captures: nav/-style folder (refs/, refs43/) or an assets folder")
+    p.set_defaults(fn=cmd_test)
+    p = sub.add_parser("build-templates")
+    p.add_argument("--legacy", action="store_true", help="from hand-labelled nav/refs into nav/templates*.npz")
+    p.set_defaults(fn=cmd_build)
+    p = sub.add_parser("calibrate")
+    p.add_argument("--rounds", type=int, default=3, help="online rounds (3: icons for mario, luigi, peach)")
+    p.add_argument("--keep", action="store_true", help="add to the captures already there (setup does)")
+    p.add_argument("--no-firstboot", action="store_true", help="never use the scratch profile i13")
+    p.add_argument("--adopt", action="store_true", help="restart instances 1 / 7 if they are running")
+    p.add_argument("--keep-server", action="store_true", help="leave the game server running")
+    p.set_defaults(fn=cmd_calibrate)
     p = sub.add_parser("classify"); p.add_argument("paths", nargs="+"); p.set_defaults(fn=cmd_classify)
     p = sub.add_parser("watch"); p.add_argument("--players", type=int, default=3)
     p.add_argument("instances", type=int, nargs="*")
@@ -451,10 +541,11 @@ def main(argv=None):
     p.set_defaults(fn=cmd_shot)
     p = sub.add_parser("setup"); p.add_argument("instances", type=int, nargs="*")
     p.add_argument("--force", action="store_true"); p.add_argument("--parallel", type=int, default=3)
+    p.add_argument("--ocr", action="store_true", help="read the screens with OCR even if templates exist")
     p.add_argument("--timeout", type=float, default=420.0)
     p.set_defaults(fn=cmd_setup)
     a = ap.parse_args(argv)
-    if a.cmd not in ("build-templates", "test"):
+    if a.cmd not in ("build-templates", "test", "calibrate", "setup"):
         # Load both template banks now: the workers load them lazily in their threads,
         # where a missing file would only stop the thread.
         screen.bank()

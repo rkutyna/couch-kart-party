@@ -35,8 +35,8 @@ import screen as S
 from screen import Result
 
 NAV_DIR = os.path.dirname(os.path.abspath(__file__))
-REFS_DIR = os.path.join(NAV_DIR, "refs43")
-BANK_FILE = os.path.join(NAV_DIR, "templates43.npz")
+REFS_DIR = os.path.join(NAV_DIR, "refs43")         # hand-labelled captures (legacy; not in git)
+BANK_FILE = S.bank_path("templates43.npz")         # see screen.bank_path
 
 FRAME_W, FRAME_H = 1280, 1016
 PIC_Y0, PIC_H, PIC_W = 56, 960, 1280
@@ -117,56 +117,60 @@ def char_cell(r, c):
     return (x0 + 60, y0 + 15, x0 + CHAR_CELL_W - 60, y0 + CHAR_CELL_H - 15)
 
 
-# (kind, key, file); see build_bank
+# (kind, key, legacy reference file in refs43, source spec); see screen.TEMPLATES
+DIALOG_STATES = S.DIALOG_STATES
+WFC_STATES = ("wfc_menu", "connecting", "connect2", "wfc_notice", "permit_prompt")
 TEMPLATES = [
-    ("title", "main_menu", "mm_single_1.png"),
-    ("title", "license_select", "license_select_1.png"),
-    ("title", "create_license", "create_license_1.png"),
-    ("title", "choose_mii", "choose_mii_lic_1.png"),
-    ("title", "choose_mii", "choose_mii_p2_1.png"),
-    ("title", "controller_reg", "ctrl_reg_ok_1.png"),
-    ("title", "characters", "chars_1.png"),
-    ("title", "vehicles", "vehicles_1.png"),
-    ("title", "drift", "drift_1.png"),
-    ("title", "wfc", "wfc_menu_1.png"),
-    ("title", "ww_mode", "ww_mode_1.png"),
-    ("title", "searching", "searching_2.png"),
-    ("title", "check_members", "check_members_1.png"),
-    ("title", "course_poll", "course_poll_1.png"),
-    ("title", "courses", "courses_cups_1.png"),
-    ("back", "back", "mm_single_1.png"),
-    ("aicon", "a", "welcome_1.png"),
-    ("aicon", "a", "disconnected_1.png"),
-    ("aicon", "a", "guest_notice_1.png"),
-    ("t_health", "health", "health_1.png"),
-    ("t_title", "title", "title_1.png"),
-    ("t_welcome", "welcome", "welcome_1.png"),
-    ("t_disconnected", "disconnected", "disconnected_1.png"),
-    ("t_vote", "vote", "vote_prompt_1.png"),
-    ("t_connecting", "connecting", "connecting_1.png"),
-    ("t_connect2", "connect2", "connect2_1.png"),
-    ("t_results", "results", "results_1.png"),
-    ("t_nextrace", "nextrace", "next_race_1.png"),
-    ("t_next_btn", "next", "wfc_notice_1.png"),
-    ("t_permit", "permit", "permit_prohibit_1.png"),
-    ("t_wontplay", "wontplay", "wont_play_no_1.png"),
-    ("t_opponents", "opponents", "opponents_1.png"),
-    ("hint", "main_menu:single", "mm_single_1.png"),
-    ("hint", "main_menu:single", "mm_single_2.png"),
-    ("hint", "main_menu:wfc", "mm_wfc_1.png"),
-    ("hint", "main_menu:wfc2", "mm_wfc2_1.png"),
-    ("hint", "main_menu:wfc2", "mm_wfc2_2.png"),
-    ("hint", "main_menu:multi", "mm_multi2_1.png"),
-    ("hint", "main_menu:multi", "mm_multi3_1.png"),
-    ("hint", "main_menu:multi", "mm_multi4_1.png"),
-    ("hint", "main_menu:channel", "mm_channel_1.png"),
-    ("hint", "main_menu:license", "mm_license_1.png"),
-    ("hint", "main_menu:license", "mm_license_2.png"),
-    ("hint", "controller_reg:wait", "ctrl_reg_wait_1.png"),
-    ("hint", "controller_reg:ok", "ctrl_reg_ok_1.png"),
-    ("hint", "course_poll:waiting", "course_poll_1.png"),
+    ("title", "main_menu", "mm_single_1.png", ("main_menu", None, None)),
+    ("title", "license_select", "license_select_1.png", ("license_select", None, None)),
+    ("title", "create_license", "create_license_1.png", ("create_license", None, None)),
+    ("title", "choose_mii", "choose_mii_lic_1.png", ("choose_mii", "p1", None)),
+    ("title", "choose_mii", "choose_mii_p2_1.png", ("choose_mii", "p2", None)),
+    ("title", "controller_reg", "ctrl_reg_ok_1.png", ("controller_reg", None, None)),
+    ("title", "characters", "chars_1.png", ("characters", None, None)),
+    ("title", "vehicles", "vehicles_1.png", ("vehicles", None, None)),
+    ("title", "drift", "drift_1.png", ("drift", None, None)),
+    ("title", "wfc", "wfc_menu_1.png", (WFC_STATES, None, "nintendo wfc 2p")),
+    ("title", "wfc", None, (WFC_STATES, None, "nintendo wfc 1p")),
+    ("title", "ww_mode", "ww_mode_1.png", ("ww_mode", None, None)),
+    ("title", "searching", "searching_2.png", ("searching", None, None)),
+    ("title", "check_members", "check_members_1.png", ("check_members", None, None)),
+    ("title", "course_poll", "course_poll_1.png", ("course_poll", None, None)),
+    ("title", "courses", "courses_cups_1.png", (("courses_cups", "courses_list"), None, None)),
+    ("back", "back", "mm_single_1.png", ("main_menu", None, None)),
+    ("aicon", "a", "welcome_1.png", ("@dialog", None, None)),
+    ("aicon", "a", "disconnected_1.png", ("@dialog", None, None)),
+    ("aicon", "a", "guest_notice_1.png", ("@dialog", None, None)),
+    ("t_health", "health", "health_1.png", ("health", None, None)),
+    ("t_title", "title", "title_1.png", ("title", None, None)),
+    ("t_welcome", "welcome", "welcome_1.png", ("welcome", None, None)),
+    ("t_disconnected", "disconnected", "disconnected_1.png", ("disconnected_dialog", None, None)),
+    ("t_vote", "vote", "vote_prompt_1.png", ("vote_prompt", None, None)),
+    ("t_connecting", "connecting", "connecting_1.png", ("connecting", None, None)),
+    ("t_connect2", "connect2", "connect2_1.png", ("connect2", None, None)),
+    ("t_results", "results", "results_1.png", ("results", None, None)),
+    ("t_nextrace", "nextrace", "next_race_1.png", ("next_race_menu", "next", None)),
+    ("t_next_btn", "next", "wfc_notice_1.png", ("wfc_notice", None, None)),
+    ("t_permit", "permit", "permit_prohibit_1.png", ("permit_prompt", None, None)),
+    ("t_wontplay", "wontplay", "wont_play_no_1.png", ("wont_play", None, None)),
+    ("t_opponents", "opponents", "opponents_1.png", ("opponents_chosen", None, None)),
+    ("hint", "main_menu:single", "mm_single_1.png", ("main_menu", "single", None)),
+    ("hint", "main_menu:single", "mm_single_2.png", ("main_menu", "single", None)),
+    ("hint", "main_menu:wfc", "mm_wfc_1.png", ("main_menu", "wfc", None)),
+    ("hint", "main_menu:wfc2", "mm_wfc2_1.png", ("main_menu", "wfc2", None)),
+    ("hint", "main_menu:wfc2", "mm_wfc2_2.png", ("main_menu", "wfc2", None)),
+    ("hint", "main_menu:multi", "mm_multi2_1.png", ("main_menu", "multi", "two players")),
+    ("hint", "main_menu:multi", "mm_multi3_1.png", ("main_menu", "multi", "three players")),
+    ("hint", "main_menu:multi", "mm_multi4_1.png", ("main_menu", "multi", "four players")),
+    ("hint", "main_menu:channel", "mm_channel_1.png", ("main_menu", "channel", None)),
+    ("hint", "main_menu:license", "mm_license_1.png", ("main_menu", "license", None)),
+    ("hint", "main_menu:license", "mm_license_2.png", ("main_menu", "license", None)),
+    ("hint", "controller_reg:wait", "ctrl_reg_wait_1.png", ("controller_reg", "wait", None)),
+    ("hint", "controller_reg:ok", "ctrl_reg_ok_1.png", ("controller_reg", "ok", None)),
+    ("hint", "course_poll:waiting", "course_poll_1.png", ("course_poll", None, "waiting for everyone")),
 ]
-# Name labels: (kind, key, file, which label the reference shows)
+# Name labels: (kind, key, legacy file, which label the legacy reference shows). A
+# generated bank takes each name from whichever player's label shows it.
 NAME_REFS = [("charname", n, f"cn_p1_{n}.png", 0) for n in
              ("wario", "toad", "baby-mario", "mario", "yoshi", "donkey-kong")] + \
             [("charname", n, f"cn_p2_{n}.png", 1) for n in
@@ -210,19 +214,35 @@ def _feat(pic, roi, kind, grow=0):
 _bank = None
 
 
-def build_bank(refs_dir: str = REFS_DIR, out: str = BANK_FILE) -> int:
-    entries = [(k, key, f, ROIS[k]) for k, key, f in TEMPLATES]
+def use_bank(path: str):
+    global BANK_FILE, _bank
+    BANK_FILE = path
+    _bank = None
+
+
+def legacy_entries():
+    entries = [(k, key, f, ROIS[k]) for k, key, f, _spec in TEMPLATES if f]
     for kind, key, f, which in NAME_REFS:
         entries.append((kind, key, f, (CHAR_LABELS if kind == "charname" else VEH_LABELS)[which]))
     kind, key, f, (r, c) = OK_REF
     entries.append((kind, key, f, char_cell(r, c)))
+    return entries
+
+
+def build_bank(refs_dir: str = REFS_DIR, out: str | None = None, entries=None) -> int:
+    """See screen.build_bank (entries: [(kind, key, file, roi)], default the legacy ones)."""
+    out = out or BANK_FILE
+    entries = legacy_entries() if entries is None else entries
     arrays, meta, cache = {}, [], {}
     for i, (kind, key, f, roi) in enumerate(entries):
         if f not in cache:
             cache[f] = picture_of(S.load_frame(os.path.join(refs_dir, f)))
         arrays[f"t{i}"] = _feat(cache[f], roi, kind).astype(np.float32)
-        meta.append({"kind": kind, "key": key, "src": f, "roi": list(roi)})
-    np.savez_compressed(out, meta=json.dumps(meta), **arrays)
+        meta.append({"kind": kind, "key": key, "src": os.path.basename(f), "roi": list(roi)})
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    tmp = out + ".tmp.npz"
+    np.savez_compressed(tmp, meta=json.dumps(meta), **arrays)
+    os.replace(tmp, out)
     global _bank
     _bank = None
     return len(entries)
@@ -232,9 +252,7 @@ def bank() -> dict:
     global _bank
     if _bank is None:
         if not os.path.exists(BANK_FILE):
-            if not os.path.isdir(REFS_DIR):
-                raise SystemExit(S.assets_missing(BANK_FILE, REFS_DIR))
-            build_bank()
+            raise SystemExit(S.assets_missing(BANK_FILE))
         z = np.load(BANK_FILE, allow_pickle=False)
         meta = json.loads(str(z["meta"]))
         b = {}

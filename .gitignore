@@ -2,6 +2,9 @@
 # the disc image, Dolphin profiles and saves (instances/), the upstream clones
 # (server/wfc-server, patcher/*), the toolchain, keys, certificates, the database,
 # logs and build output, none of which belong in git. Add new source paths here.
+# Game-derived files (screen templates, captures, test-phone icons: assets/ or wherever
+# MKPARTY_ASSETS points) are generated on each Mac by ./mkparty calibrate and must never
+# be listed here.
 /*
 
 !/.gitignore

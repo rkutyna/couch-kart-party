@@ -39,6 +39,20 @@ def get(key: str, default: str = "") -> str:
     return _load().get(key) or default
 
 
+def assets_dir() -> str:
+    """The folder of the game-derived assets generated on this Mac by `./mkparty calibrate`
+    (screen templates, their captures, test-phone icons): MKPARTY_ASSETS (environment or
+    mkparty.conf), default <root>/assets. Never in git."""
+    d = get("MKPARTY_ASSETS")
+    if not d:
+        return os.path.join(ROOT, "assets")
+    return d if os.path.isabs(d) else os.path.join(ROOT, d)
+
+
+def assets_explicit() -> bool:
+    return bool(get("MKPARTY_ASSETS"))
+
+
 def dolphin_binary() -> str:
     app = get("DOLPHIN_APP", "/Applications/Dolphin.app").rstrip("/")
     return os.path.join(app, "Contents", "MacOS", "Dolphin")

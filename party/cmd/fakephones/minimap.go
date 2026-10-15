@@ -5,9 +5,9 @@ package main
 // The minimap sits at a fixed place (picture x 860..1260, y 220..660; the frame file
 // has the picture at rows 186..906) with a fixed orientation. The kart's own icon is
 // drawn larger than the others; it is found by normalized correlation with a crop of
-// that character's icon (icons/<character>.png, 35x35, cut from race captures; read
-// from party/cmd/fakephones/icons at run time, see iconDir: these game-derived pictures
-// are not in the git repository, and without them the bots do not steer). The
+// that character's icon (<character>.png, 35x35, cut from race captures by `./mkparty
+// calibrate` on the user's own machine, see iconDir: these game-derived pictures are never
+// in the git repository; a bot without its icon drives without steering). The
 // heading is the direction of the translucent yellow view cone around the icon. The
 // course's centre line below was traced from captures (minimap coordinates, race
 // direction: up the left straight from the start line, clockwise).
@@ -28,17 +28,24 @@ const mmX0, mmY0, mmX1, mmY1 = 860, 220, 1260, 660
 const mmW, mmH = mmX1 - mmX0, mmY1 - mmY0
 const iconR = 17
 
-// iconDir holds the minimap icons: $FAKEPHONES_ICONS, else party/cmd/fakephones/icons
+// iconDir holds the minimap icons: $FAKEPHONES_ICONS, else the icons folder of the assets
+// that `./mkparty calibrate` generates from the user's own game ($MKPARTY_ASSETS/icons, or
+// assets/icons at the project root), else party/cmd/fakephones/icons (older installs),
 // found from the binary (run/bin/fakephones) or the current directory.
 func iconDir() string {
 	if d := os.Getenv("FAKEPHONES_ICONS"); d != "" {
 		return d
 	}
 	var cands []string
-	if exe, err := os.Executable(); err == nil {
-		cands = append(cands, filepath.Join(filepath.Dir(exe), "..", "..", "party", "cmd", "fakephones", "icons"))
+	if d := os.Getenv("MKPARTY_ASSETS"); d != "" {
+		cands = append(cands, filepath.Join(d, "icons"))
 	}
-	cands = append(cands, filepath.Join("cmd", "fakephones", "icons"), filepath.Join("party", "cmd", "fakephones", "icons"))
+	if exe, err := os.Executable(); err == nil {
+		root := filepath.Join(filepath.Dir(exe), "..", "..")
+		cands = append(cands, filepath.Join(root, "assets", "icons"), filepath.Join(root, "party", "cmd", "fakephones", "icons"))
+	}
+	cands = append(cands, filepath.Join("..", "assets", "icons"), filepath.Join("assets", "icons"),
+		filepath.Join("cmd", "fakephones", "icons"), filepath.Join("party", "cmd", "fakephones", "icons"))
 	for _, d := range cands {
 		if st, err := os.Stat(d); err == nil && st.IsDir() {
 			return d
@@ -70,7 +77,7 @@ func loadTpl(char string) *iconTpl {
 	p := filepath.Join(iconDir(), char+".png")
 	b, err := os.ReadFile(p)
 	if err != nil {
-		log.Printf("minimap: no icon for %s (%v); this bot will not steer. The icons are game assets distributed separately (README.md, 'Game assets').", char, err)
+		log.Printf("minimap: no icon for %s (%v); this bot will not steer. The icons are generated from your own game by ./mkparty calibrate (README.md, 'Game assets').", char, err)
 		return nil
 	}
 	img, err := png.Decode(bytes.NewReader(b))

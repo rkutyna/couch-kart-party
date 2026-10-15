@@ -20,3 +20,7 @@ GAME_IMAGE=""
 # Phone server ports (http, https).
 #PARTY_PORT="8000"
 #HTTPS_PORT="8443"
+
+# Where ./mkparty calibrate puts the game-derived assets it generates from your game
+# (screen templates, captures, test-phone icons). Default: assets/ in this folder.
+#MKPARTY_ASSETS="/path/to/assets"

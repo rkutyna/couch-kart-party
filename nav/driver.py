@@ -222,12 +222,20 @@ class Saver(threading.Thread):
 
 class Worker(threading.Thread):
     def __init__(self, k: int, log: Log, cat: Catalog, saver: Saver, run_id: str, hooks: Hooks | None = None,
-                 setup: bool = False):
+                 setup: bool = False, classifier=None, collector=None):
         super().__init__(daemon=True, name=f"worker-i{k}")
         self.k = k
         self.inst = dolphin.Instance(k, setup=setup)
         self.two = self.inst.mode == "2p"
-        self.cls = screen43 if self.inst.aspect43 else screen
+        # classifier: an object with classify_frame(frame) (default: the template classifier
+        # of the instance's aspect; calibration passes ocrscreen.OcrScreen). collector:
+        # called with (worker, frame, result, time) after every observation (calibration).
+        self.cls = classifier or (screen43 if self.inst.aspect43 else screen)
+        self.collector = collector
+        self.linger = {}                # state -> s to stay on it before acting (calibration)
+        self.explore_wont_play = False  # setup / calibration: visit "Prohibit" -> No once
+        self.hold_pick = False          # calibration: on the targets, do not press A (yet)
+        self.explored = set()
         self.log = log
         self.cat = cat
         self.saver = saver
@@ -366,6 +374,8 @@ class Worker(threading.Thread):
             if self.pending is not None:
                 self.pending.fresh += 1
         self._observe(res, t1)
+        if self.collector is not None:
+            self.collector(self, frame, res, t1)
         self._scan_dolphin_log(t1)
         if self._emulation_dead(res, t1):
             return
@@ -651,6 +661,8 @@ class Worker(threading.Thread):
         st, cur = self.stable
         if st is None:
             return
+        if now - self.stable_since < self.linger.get(st, 0.0):
+            return
         act = self._plan(st, cur, now)
         self._status(self._status_for(st))
         if act is not None:
@@ -824,6 +836,13 @@ class Worker(threading.Thread):
             return Action("A on a guest Mii (new license)", button="A")
         if st in ("connect2", "create_license", "wfc_notice"):
             return Action(f"A on {st}", button="A")
+        if st == "permit_prompt" and self.explore_wont_play and "wont_play" not in self.explored:
+            # calibration: show "You will not be able to play ..." once (Prohibit, then No)
+            if cur != "prohibit":
+                return Action("DOWN to Prohibit (to see the confirmation once)", move="DOWN", timeout=T_MOVE)
+            return Action("A on Prohibit (the next screen asks again: No)", button="A")
+        if st == "wont_play":
+            self.explored.add("wont_play")
         if st == "permit_prompt":
             if cur != "permit":
                 return Action("UP to Permit (data goes to the local server)", move="UP", timeout=T_MOVE)
@@ -868,6 +887,8 @@ class Worker(threading.Thread):
         a = self._grid_move(state, cur, want, grid, rows)
         if a is not None:
             return a
+        if self.hold_pick:
+            return None
         self.shot(f"pick_{state}_{want}")
         return Action(f"A to pick {want}", button="A")
 
@@ -929,6 +950,8 @@ class Worker(threading.Thread):
             return Action(f"{m1.move} (A) + {m2.move} (B) on {state}: A {n1} -> {wants[0]}, B {n2} -> {wants[1]}",
                           moves=((1, m1.move), (2, m2.move)), timeout=T_MOVE)
         if m1 is None and m2 is None:
+            if self.hold_pick:
+                return None
             # both on their targets: A for A then B (B's A leaves the screen)
             self.shot(f"pick_{state}_{wants[0]}_{wants[1]}")
             todo = [p for p in (1, 2) if p not in done]
@@ -1314,7 +1337,7 @@ class Runner:
     the host's instance is unmuted)."""
 
     def __init__(self, ks, log: Log, run_id: str, with_lobby: bool = False, keepalive: float = 0.0,
-                 pool: bool = False, setup: bool = False):
+                 pool: bool = False, setup: bool = False, classifier_factory=None, collector=None):
         self.log = log
         self.run_id = run_id
         self.cat = Catalog()
@@ -1324,12 +1347,14 @@ class Runner:
         self.hooks = LobbyHooks(log) if with_lobby else Hooks()
         self.pool = pool
         self.setup = setup
+        self.classifier_factory = classifier_factory   # k -> classifier (None: templates)
+        self.collector = collector
         os.makedirs(UNKNOWN_DIR, exist_ok=True)
         self.workers = {}
         self._wlock = threading.Lock()
         self._boot_sem = threading.Semaphore(BOOT_PARALLEL)
         for k in ks:
-            self.workers[k] = Worker(k, log, self.cat, self.saver, run_id, self.hooks, setup=setup)
+            self.workers[k] = self.new_worker(k)
         self.round = 0
         self.active = set()                # instances racing this round
         self.assign = {}                   # instance -> slots of this round
@@ -1353,6 +1378,11 @@ class Runner:
         self.last_prune = time.time()
         self.prune = None                  # callable that prunes the logs (nav.py)
         self.started = False
+
+    def new_worker(self, k: int) -> Worker:
+        cls = self.classifier_factory(k) if self.classifier_factory else None
+        return Worker(k, self.log, self.cat, self.saver, self.run_id, self.hooks, setup=self.setup,
+                      classifier=cls, collector=self.collector)
 
     def start(self):
         self.started = True
@@ -1395,7 +1425,7 @@ class Runner:
                 if ok:
                     inst.launched_at = inst.launched_at or time.time()
                     time.sleep(BOOT_SPACING)
-            w = Worker(k, self.log, self.cat, self.saver, self.run_id, self.hooks)
+            w = self.new_worker(k)
             w.inst.launched_at = inst.launched_at or time.time()
             with self._wlock:
                 self.workers[k] = w
