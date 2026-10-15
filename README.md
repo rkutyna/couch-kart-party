@@ -1,4 +1,6 @@
-# mkparty: a phone-controlled Mario Kart Wii party
+# Couch Kart Party
+
+Phone-controlled local Mario Kart Wii parties.
 
 Up to 12 players race each other online in Mario Kart Wii, each controlling the game from
 their own phone. Everything runs on one Mac: a private Nintendo-WFC-compatible server
@@ -16,7 +18,8 @@ its phone(s).
 The player count is not set by hand: it follows the phones that are in the lobby
 (connected and Ready) when the host taps Start.
 
-Licence: to be decided (see [Credits and licences](#credits-and-licences)).
+Licence: MIT for this project's code, except the two patch files in `patches/`, which have
+their own licences (see [Licence](#licence)).
 
 ## Requirements
 
@@ -43,12 +46,12 @@ Licence: to be decided (see [Credits and licences](#credits-and-licences)).
 * The terminal that runs mkparty needs Screen Recording permission (the games' windows
   are captured).
 * The screen templates the navigator uses to read the game's menus: see
-  [Game assets](#game-assets) (currently distributed separately).
+  [Game assets](#game-assets) (generated locally from your own disc; in progress).
 
 ## Install
 
-    git clone https://github.com/rkutyna/mk-wii-party.git
-    cd mk-wii-party
+    git clone https://github.com/rkutyna/couch-kart-party.git
+    cd couch-kart-party
     ./mkparty setup --game "/path/to/Mario Kart Wii (USA).wbfs"   # add --dolphin /path/to/Dolphin.app if elsewhere
 
 `./mkparty setup` is safe to run again at any time: every step checks what is already
@@ -214,8 +217,8 @@ navigator enters player A's choice in the first race, player B's in the next, an
 
 ## Game assets
 
-Some files are derived from the game itself and are **not in this repository** for now
-(how to distribute them is still to be decided):
+Some files are derived from the game itself and are **not in this repository**; they are
+generated locally from your own disc (in progress):
 
 * `nav/templates.npz`, `nav/templates43.npz`: the screen templates the navigator
   matches the game's menus against. **Required** to run a party: copy them into `nav/`.
@@ -226,19 +229,26 @@ Some files are derived from the game itself and are **not in this repository** f
 * `party/cmd/fakephones/icons/`: minimap icons for the test phones' auto-steering
   (optional; without them test phones do not steer).
 
-## Credits and licences
+## Licence
 
-Licence of this project: **to be decided**. Until then no licence is granted.
+* This project's code, everything in this repository except the two patch files below,
+  is licensed under the MIT License; see [LICENSE](LICENSE). Copyright (c) 2026 Roger Kutyna.
+* The two patch files in `patches/` modify WiiLink's wfc-server and wfc-patcher-wii, so
+  they carry those projects' licences: `wfc-server.patch` is AGPL-3.0, and
+  `wfc-patcher-wii.patch` is under WiiLink's licence. See [patches/README.md](patches/README.md).
+* Game assets: generated locally from your own disc (in progress); not distributed with
+  this repo.
+
+## Credits
 
 This project builds on, and fetches at setup time (it does not include their code):
 
 * **WiiLink WFC** - <https://wfc.wiilink.ca>
   * [wfc-server](https://github.com/WiiLink24/wfc-server) (AGPL-3.0): the game server.
     Our changes are in `patches/wfc-server.patch`.
-  * [wfc-patcher-wii](https://github.com/WiiLink24/wfc-patcher-wii) (WiiLink's BSD-style
-    licence with attribution, or GPL-2.0-or-later): the game patch and payload. Our
-    changes (an altered version: server by IP literal, no DNS) are in
-    `patches/wfc-patcher-wii.patch`.
+  * [wfc-patcher-wii](https://github.com/WiiLink24/wfc-patcher-wii) (WiiLink's licence): the
+    game patch and payload. Our changes (an altered version: server by IP literal, no DNS)
+    are in `patches/wfc-patcher-wii.patch`.
 * [Dolphin](https://dolphin-emu.org) (GPL-2.0-or-later): the emulator, installed by you.
 * [devkitPro](https://devkitpro.org): devkitPPC and the
   [buildscripts](https://github.com/devkitPro/buildscripts) whose patches
@@ -250,6 +260,6 @@ This project builds on, and fetches at setup time (it does not include their cod
   [NumPy](https://numpy.org), [Pillow](https://python-pillow.org),
   [cryptography](https://cryptography.io).
 
-Mario Kart Wii is a trademark of Nintendo. This project is not affiliated with or endorsed
-by Nintendo, WiiLink or the Dolphin project, and contains no Nintendo software: you
-provide your own game.
+Mario Kart Wii and Wii are trademarks of Nintendo. This project is not affiliated with or
+endorsed by Nintendo, WiiLink or the Dolphin project, and contains no Nintendo software:
+you need your own legally obtained copy of the game.

@@ -6,6 +6,7 @@
 
 !/.gitignore
 !/README.md
+!/LICENSE
 !/mkparty
 !/setup.sh
 !/mkparty.conf.example
