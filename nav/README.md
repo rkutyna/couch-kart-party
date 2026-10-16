@@ -21,10 +21,14 @@ Every instance also has Pipes/hk (hotkeys: screenshot, Volume Up/Down).
     dolphin.py    one instance: pid / window / capture / pads p1, p2 / hotkeys / relaunch
     driver.py     Worker (one thread per instance, closed loop) and Runner (lobby, pool)
     lobby.py      partyd client (/api/nav/*)
-    offline_test.py, labels.json + refs/, labels43.json + refs43/   offline test
-    templates.npz, templates43.npz   built by `nav.py build-templates`
-                  (refs*, labels*.json and templates*.npz are game-derived and not in
-                  git; see "Game assets" in the top-level README.md)
+    ocrscreen.py  the same states / cursors read with Apple's Vision OCR (run/bin/ocr), no
+                  templates: used to bootstrap (setup on a new install, calibrate)
+    calibrate.py  generates the template banks from this Mac's own game (nav.py calibrate)
+    offline_test.py  offline test of the banks over labelled captures
+    <assets>/     (MKPARTY_ASSETS, default ../assets; game-derived, never in git; see
+                  "Game assets" in the top-level README.md): templates.npz,
+                  templates43.npz, captures/ + labels.json + labels43.json, sources.json,
+                  icons/ (fakephones). Older installs: templates*.npz, refs*/, labels*.json in nav/
     localconf.py  reads mkparty.conf (DOLPHIN_APP, PARTY_PORT) like run/lib.sh
     fakephones/   configs for party/cmd/fakephones (test phones)
     logs/         nav-<mode>-<time>.log, -obs-i<k>.log, shots/<run>/, unknown/
@@ -41,11 +45,16 @@ Every instance also has Pipes/hk (hotkeys: screenshot, Volume Up/Down).
 
 ## Modes
 
-    nav.py test [-v]
-        Offline classifier test over refs/ + labels.json and refs43/ + labels43.json;
-        prints a per-state table and the confusions. Must print 100 % for both.
-    nav.py build-templates
-        Rebuild templates.npz and templates43.npz after adding a reference or changing a region.
+    nav.py test [-v] [--refs DIR]
+        Offline test of the banks in use over labelled captures: DIR = an assets folder
+        (captures/ + labels*.json, as calibrate leaves them) or a folder with refs/,
+        refs43/, labels*.json (hand-labelled). Default: nav/ if it has labels.json, else
+        the assets folder. Prints a per-state table and the confusions; must be 100 %.
+    nav.py calibrate [--rounds 3] [--keep] [--no-firstboot]
+        (./mkparty calibrate) Generate the banks from this Mac's own game (see below).
+    nav.py build-templates [--legacy]
+        Rebuild both banks from the calibration captures (after changing a region or
+        TEMPLATES); --legacy: from hand-labelled nav/refs* into nav/templates*.npz.
     nav.py classify <png> ...
     nav.py setup [k ...] [--force] [--parallel 3] [--timeout 420]
         (./mkparty setup --profiles) Once per profile: provision, boot in 4:3 (--setup), go through
@@ -82,7 +91,8 @@ Every instance also has Pipes/hk (hotkeys: screenshot, Volume Up/Down).
     nav.py shot <k> <file.png>
 
 Fake phones (built by `./mkparty setup`, or `cd party && go build -o ../run/bin/fakephones ./cmd/fakephones`;
-minimap icons from party/cmd/fakephones/icons, not in git):
+minimap icons from <assets>/icons, made by calibrate; FAKEPHONES_ICONS overrides; without
+an icon a phone drives without steering):
 
     run/bin/fakephones -config nav/fakephones/p7.json -wait-msg Ready \
         [-rounds 5 -reset-after 20s] [-after-live wiggle|idle] [-duration 30m] [-dump DIR]
@@ -253,16 +263,55 @@ character, vehicle, cup or course is in) come from party/web/catalog.json only.
   and are dropped. On 2p instances (one shared, rotated minimap) they are often dropped
   even there.
 * `nav.py setup` handled fresh saves for i4-i6 and i8-i12 (license, consent, second
-  player). A first-boot screen not in refs43/ would stop setup of that profile (it then
-  says FAILED and leaves no mkparty-ready mark).
+  player). An unexpected first-boot screen would stop setup of that profile (it then says
+  FAILED and leaves no mkparty-ready mark). Without banks it reads the screens with OCR.
 * Results / "Next Race / Quit Game" / "Please wait a moment" are classified (states
   results, next_race_menu, please_wait); the team/points variants of the results screen
   have not been seen (only VS races were tested).
 
-## Adding a reference
+## Calibration (generating the templates)
 
-Copy a capture (`nav.py shot`, or from logs/shots, logs/unknown) to refs/, add
-it to labels.json (`{"state": ..., "cursor": ...}`), and, if it should be a
-template, to TEMPLATES / NAME_REFS in screen.py (4:3 captures: refs43/, labels43.json,
-screen43.py). Then `nav.py build-templates`
-and `nav.py test`.
+Nothing game-derived is in git. `nav.py calibrate` (calibrate.py) makes the banks on the
+user's Mac, from the user's own game, in three steps:
+
+1. Capture, reading the screens with OCR (ocrscreen.py: title strip, hint line, name
+   labels and dialog texts by Vision OCR, plus the template-free readers of screen.py /
+   screen43.py: white button labels, member rows, race HUD, 4:3 cups / course rows /
+   drift). The Collector keeps up to 3 frames per (aspect, state, cursor, title, hint) once
+   the OCR result has held for 3 observations and the picture is not fading (dialogs: up
+   to 10 frames, for the pulsing (A) icon; title / health only after ~2 s, when the logo
+   has settled).
+   * first-boot screens (4:3): a scratch profile i13 with a fresh save is set up with
+     driver.Worker + OCR (Worker.explore_wont_play visits Prohibit -> "You will not be
+     able to play" -> No once); i13 is deleted afterwards. `nav.py setup` on an install
+     without banks does the same with the new profiles (and `mkparty setup --profiles`
+     then calls `calibrate --keep`, so the scratch profile is not needed).
+   * menu tours (Pilot, a sequential OCR driver): i1 16:9 Main Menu (every cursor, learnt
+     by trying every move), Single Player > VS > Solo Race: 12 characters, the 6 vehicles
+     of each weight class, drift, the 4 cups and their lists; i7 4:3 Multiplayer (two
+     players) > controller registration > VS: characters (player A), player A's OK mark,
+     vehicles (A light / B medium, A heavy), both players' drift, cups and lists.
+   * online rounds (driver.Runner with OCR workers, Worker.linger so that dialogs stay up
+     long enough to be captured): i1 and i7 enter Worldwide VS one after the other, meet,
+     vote Luigi Circuit and race; in each round one console drives (Racer: A held, the
+     stick weaving) and the other idles, so the game drops the idle one (disconnect
+     dialog) and gives the other the results, Next Race, Please wait. In the two-player
+     Characters screen online both cursors tour the grid (Worker.hold_pick): its name labels
+     sit lower than offline. Three rounds, i1 as Mario, Luigi, Peach: their race frames
+     give the fakephones minimap icons (icons/<character>.png: the own icon is found by its
+     outline and view cone; the crop that agrees best with the others is kept).
+2. Build (select_sources): every row of TEMPLATES / NAME_REFS (screen.py, screen43.py) has
+   a source spec (state(s), cursor, OCR phrase). Per (kind, key) each row takes the
+   matching capture whose template matches most of the group's captures (runtime matcher,
+   score >= COVER), then extra templates are added while captures are left unmatched.
+3. Check: every capture is classified with the new banks and must agree with its OCR label
+   (offline_test over captures/ + labels*.json).
+
+Dolphin's own "Invalid read" alert sheet is recognised by its shape (screen.emu_sheet),
+not by a template.
+
+## Adding a template
+
+Add a row to TEMPLATES / NAME_REFS in screen.py (4:3: screen43.py) with the source spec of
+the screen it is cut from; if that screen is not visited yet, make calibrate.py show it.
+Then `nav.py build-templates` (from the captures) or `./mkparty calibrate`, and `nav.py test`.

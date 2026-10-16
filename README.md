@@ -45,8 +45,8 @@ their own licences (see [Licence](#licence)).
 * The phones and the Mac on the same Wi-Fi (or the Mac's Internet Sharing hotspot).
 * The terminal that runs mkparty needs Screen Recording permission (the games' windows
   are captured).
-* The screen templates the navigator uses to read the game's menus: see
-  [Game assets](#game-assets) (generated locally from your own disc; in progress).
+* Nothing else: the screen templates the navigator uses to read the game's menus are
+  generated on your Mac from your own game during setup (see [Game assets](#game-assets)).
 
 ## Install
 
@@ -74,22 +74,28 @@ there. Its steps:
    cluster in `server/pgdata` (127.0.0.1 only, port `PG_PORT`, default 54329) with
    wfc-server's schema, and builds the server.
 6. **apps**: builds the phone server `party/partyd`, the test phones `run/bin/fakephones`,
-   the window-capture helpers (`capture/bin/wincap`, `run/bin/winlist`) and the
-   self-signed HTTPS certificate (for this Mac's Bonjour name and addresses).
+   the window-capture helpers (`capture/bin/wincap`, `run/bin/winlist`), the text
+   recognition helper `run/bin/ocr` (Apple's Vision framework, offline; used only to
+   generate the screen templates) and the self-signed HTTPS certificate (for this Mac's
+   Bonjour name and addresses).
 
 Local settings live in `mkparty.conf` (created by setup from `mkparty.conf.example`, not
 in git): `DOLPHIN_APP`, `GAME_IMAGE`, and optionally `DEVKITPPC`, `PG_PORT`, `PARTY_PORT`,
-`HTTPS_PORT`.
+`HTTPS_PORT`, `MKPARTY_ASSETS`.
 
-Then, once, with the Mac unlocked (it starts Dolphin; about 5 minutes):
+Then, once, with the Mac unlocked (it starts Dolphin; about 25 minutes, the games stay
+silent; Dolphin windows come and go, leave them on screen):
 
     ./mkparty setup --profiles
 
-It prepares the 12 Dolphin profiles (`instances/i1..i6` single-player, `i7..i12`
-split-screen): creates the game's license, accepts the online data notice ("Permit"),
-registers the second controller and goes online once, all through the game's own menus.
-Profiles already set up (marked `instances/i<k>/mkparty-ready`) are skipped;
-`nav/nav.py setup <k> --force` redoes one.
+1. It prepares the 12 Dolphin profiles (`instances/i1..i6` single-player, `i7..i12`
+   split-screen): creates the game's license, accepts the online data notice ("Permit"),
+   registers the second controller and goes online once, all through the game's own menus
+   (about 6 minutes). Profiles already set up (marked `instances/i<k>/mkparty-ready`) are
+   skipped; `nav/nav.py setup <k> --force` redoes one.
+2. It then generates the screen templates from your game (`./mkparty calibrate`, about 15
+   minutes here, as the new profiles already showed the first-boot screens; see
+   [Game assets](#game-assets)).
 
 ## Run a party
 
@@ -159,8 +165,9 @@ navigator enters player A's choice in the first race, player B's in the next, an
   it and run setup again (finished steps are skipped). Build logs: `run/logs/setup-*.log`.
 * "no devkitPPC found": install devkitPro's devkitPPC, or set `DEVKITPPC` in
   `mkparty.conf`, or run `./mkparty setup --build-toolchain`.
-* "screen templates missing": the navigator's templates are not in the repository; see
-  [Game assets](#game-assets).
+* "screen templates missing" / "The screen templates are not generated yet": run
+  `./mkparty calibrate` (see [Game assets](#game-assets)). If it ends with "did not finish
+  cleanly", run it again; its log is `nav/logs/nav-calibrate-*.log`.
 * "Not installed yet …" when running `up`: run `./mkparty setup`.
   "Not set up yet: i<k> …": run `./mkparty setup --profiles`.
 * Certificate warning on the phone: expected (self-signed); accept it once, or use
@@ -198,7 +205,7 @@ navigator enters player A's choice in the first race, player B's in the next, an
 
 ## Project layout
 
-    mkparty                 the command: setup, up, down, status
+    mkparty                 the command: setup, calibrate, up, down, status
     setup.sh                installation steps (./mkparty setup)
     mkparty.conf.example    local settings template (mkparty.conf is not in git)
     requirements.txt        Python packages
@@ -214,20 +221,54 @@ navigator enters player A's choice in the first race, player B's in the next, an
     run/                    launcher scripts: Dolphin profiles, instances, capture streams
     capture/                window capture (wincap.swift) and a stand-alone stream script
     instances/              created: the Dolphin profiles with their saves (never in git)
+    assets/                 created by calibrate: screen templates etc. from your game (never in git)
 
 ## Game assets
 
-Some files are derived from the game itself and are **not in this repository**; they are
-generated locally from your own disc (in progress):
+The navigator recognises the game's screens by comparing parts of each picture (title
+strip, hint line, name labels, dialog texts) with small templates. Those templates are cut
+from pictures of the game, so **this project distributes none of them**: they are generated
+on your Mac from your own copy of the game, by
 
-* `nav/templates.npz`, `nav/templates43.npz`: the screen templates the navigator
-  matches the game's menus against. **Required** to run a party: copy them into `nav/`.
-  Without them `nav.py` stops with "screen templates missing".
-* `nav/refs/`, `nav/refs43/`, `nav/labels.json`, `nav/labels43.json`: the labelled
-  screenshots the templates are cut from (`nav/nav.py build-templates`) and that the
-  offline test uses (`nav/nav.py test`).
-* `party/cmd/fakephones/icons/`: minimap icons for the test phones' auto-steering
-  (optional; without them test phones do not steer).
+    ./mkparty calibrate        # run automatically by ./mkparty setup --profiles
+
+It needs profiles i1 and i7 set up and nothing else running (`./mkparty down`), takes
+about 18 minutes (measured: first-boot screens on a scratch profile ~4 min, menu tours ~6
+min, three short online rounds ~9-10 min, building and checking ~1 min), keeps every game
+silent and starts Dolphin windows; keep the Mac unlocked. What it does:
+
+1. It reads which screen is on display **without templates**: Apple's Vision text
+   recognition (`run/bin/ocr`, offline) reads the title, hint line, name labels and dialog
+   texts, and the known menu flow says what to press (`nav/ocrscreen.py`,
+   `nav/calibrate.py`). The project ships only this metadata: which region of which
+   screen each template is cut from and the texts the screens show.
+2. It brings up every screen the navigator must recognise and captures it: the first-boot
+   screens (new license, data notice, Permit / Prohibit, the second player) on a scratch
+   profile `instances/i13` with a fresh save (deleted afterwards; during
+   `setup --profiles` they are captured from the new profiles instead); offline tours on
+   i1 (16:9) and i7 (4:3, two players) of the main menu, all 12 characters, all 18
+   vehicles, drift, the 4 unlocked cups and their course lists; and three online rounds
+   of i1 and i7 against each other on the local game server (WFC menus, Worldwide VS,
+   Check Members, the vote, Course Poll, the race, results / Next Race / Please wait, and
+   the disconnect dialog of the console that idles).
+3. It cuts the templates from the captures that match the others best, writes the two
+   template banks and checks them: every capture must be classified as the text
+   recognition labelled it (`nav/nav.py test --refs assets`).
+
+Everything it makes is in `assets/` (`MKPARTY_ASSETS` in `mkparty.conf` or the environment
+moves it), which is never in git:
+
+* `templates.npz`, `templates43.npz`: the screen templates (16:9 and 4:3). **Required.**
+* `captures/` (about 500 pictures, ~350 MB), `labels.json`, `labels43.json`,
+  `sources.json`, `calibration.json`: the captures with their labels, which capture each
+  template came from, and the run's summary (for `nav.py test` and rebuilding with
+  `nav.py build-templates`). You may delete `captures/` once the banks exist.
+* `icons/mario.png`, `luigi.png`, `peach.png`: the minimap icons the test phones
+  (`run/bin/fakephones`) steer by, from the races of the online rounds (optional; a test
+  phone without its icon drives without steering).
+
+Installs from before calibration existed may have `nav/templates.npz` etc.; they are used
+only when `assets/` has no banks.
 
 ## Licence
 
@@ -236,8 +277,8 @@ generated locally from your own disc (in progress):
 * The two patch files in `patches/` modify WiiLink's wfc-server and wfc-patcher-wii, so
   they carry those projects' licences: `wfc-server.patch` is AGPL-3.0, and
   `wfc-patcher-wii.patch` is under WiiLink's licence. See [patches/README.md](patches/README.md).
-* Game assets: generated locally from your own disc (in progress); not distributed with
-  this repo.
+* Game assets: none are distributed; they are generated on your Mac from your own disc
+  (see [Game assets](#game-assets)).
 
 ## Credits
 

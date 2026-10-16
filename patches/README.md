@@ -26,9 +26,12 @@ makes the server work for a private, offline game on one Mac. The NAS answers th
 game's requests by IP address instead of the `nas.` host name, accepts the device ID that
 newer stage 1 payloads send, advertises loopback addresses to peers on this machine, ignores
 the Mario Kart Wii `p` matchmaking flag and a `wl:report` sent before login, and logs game
-downloads. It also adds two opt-in switches for matchmaking: `WWFC_PREFER_ROOM=1` (join the
+downloads. It also adds two switches for matchmaking: `WWFC_PREFER_ROOM=1` (join the
 fullest open room) and `WWFC_DEBUG_MATCH=1` (log each candidate room). A unit test covers the
-`p` flag change.
+`p` flag change. In the patched server itself both switches are off unless the environment
+sets them; Couch Kart Party's `server/start.sh` turns `WWFC_PREFER_ROOM` on by default
+(`WWFC_PREFER_ROOM=0` in the environment or `mkparty.conf` turns it off), so in a party it
+is on unless you say otherwise.
 
 **`wfc-patcher-wii.patch`** (wfc-patcher-wii; `include/`, `patch/`, `payload/`, `stage1/`):
 builds a "no-DNS" game patch. The online-service host names the game uses (`nintendowifi.net`,
@@ -46,4 +49,5 @@ wfc-patcher-wii. The full text is in [LICENSE-wfc-patcher-wii](LICENSE-wfc-patch
 (copied verbatim from the upstream `LICENSE`).
 
 This is an altered version of WiiLink's wfc-patcher-wii. Credit: WiiLink WFC -
-https://wfc.wiilink.ca
+https://wfc.wiilink.ca. `setup.sh` also writes a notice saying so,
+`ALTERED-BY-COUCH-KART-PARTY.md`, into the patched clone (`patcher/wfc-patcher-wii-local`).
