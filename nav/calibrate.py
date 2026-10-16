@@ -71,7 +71,8 @@ class Collector:
     # state -> (frames kept, s between them, consecutive same observations needed)
     LIMITS = {"welcome": (10, 0.12, 3), "disconnected_dialog": (10, 0.12, 3), "error_dialog": (10, 0.12, 3),
               "race": (6, 1.0, 3), "title": (3, 0.8, 6), "health": (3, 0.8, 6),
-              "course_poll": (4, 0.3, 2), "next_race_menu": (3, 0.3, 2), "please_wait": (4, 0.3, 2)}
+              "course_poll": (4, 0.3, 2), "next_race_menu": (3, 0.3, 2), "please_wait": (4, 0.3, 2),
+              "preparing": (3, 0.25, 2)}
 
     def __init__(self, assets: str, log, per_key: int = 3, gap: float = 0.35, settle: int = 3):
         self.dir = os.path.join(assets, "captures")
@@ -691,6 +692,17 @@ def _tour2p_step(w, tr, log):
         w.hold_pick = False
 
 
+EXTRA_ROUNDS = 2      # rounds added while a screen of the online part has not been captured
+ONLINE_SCREENS = [("16x9", "preparing"), ("16x9", "please_wait"), ("16x9", "results"), ("4x3", "results"),
+                  ("16x9", "next_race_menu"), ("4x3", "next_race_menu"), ("16x9", "disconnected_dialog"),
+                  ("4x3", "disconnected_dialog"), ("16x9", "vote_prompt"), ("4x3", "vote_prompt"),
+                  ("4x3", "opponents_chosen")]
+
+
+def online_missing(col: Collector):
+    return [f"{a} {st}" for a, st in ONLINE_SCREENS if not col.have(a, st)]
+
+
 def online_rounds(log, col: Collector, run_id: str, ks=(1, 7), rounds: int = 3, timeout: float = 420.0):
     """Bring ks online together and play `rounds` short rounds (Luigi Circuit). Round i:
     instance ks[i % 2] drives, the other idles. Returns {character: [race frames]} of the
@@ -704,7 +716,14 @@ def online_rounds(log, col: Collector, run_id: str, ks=(1, 7), rounds: int = 3, 
         if not r.prepare(300):
             raise Stop("online: the instances did not reach the Nintendo WFC menu")
         one = [k for k in ks if dolphin.inst_mode(k) == "1p"]
-        for rnd in range(1, rounds + 1):
+        rnd = 0
+        while rnd < rounds + EXTRA_ROUNDS:
+            rnd += 1
+            if rnd > rounds:
+                miss = online_missing(col)
+                if not miss:
+                    break
+                log(f"cal online: not seen yet: {', '.join(miss)}; one more round")
             active = [ks[(rnd - 1) % len(ks)]]
             ch = ICON_CHARS[(rnd - 1) % len(ICON_CHARS)]
             log(f"cal online round {rnd}/{rounds}: active (drives) {active}, single-player character {ch}")
@@ -720,7 +739,9 @@ def online_rounds(log, col: Collector, run_id: str, ks=(1, 7), rounds: int = 3, 
                 w.set_goal(g)
                 w.hold_pick = w.two
             tours = {k: {} for k, w in r.workers.items() if w.two}
-            order = sorted(r.workers.values(), key=lambda w: (w.two, w.k))
+            # who enters Worldwide VS first (and so usually hosts) alternates between rounds:
+            # some screens ("Please wait a moment") show only on one side
+            order = sorted(r.workers.values(), key=lambda w: (w.two, w.k), reverse=(rnd % 2 == 0))
             entered = 0
             while time.time() - t0 < timeout:
                 for k, tr in tours.items():
