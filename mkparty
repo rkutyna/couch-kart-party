@@ -163,10 +163,18 @@ cmd_setup() {
 # templates_present: both screen-template banks exist where the navigator reads them.
 templates_present() {
   python3 -I - "$ROOT/nav" <<'PY' 2>/dev/null
-import os, sys
+import json, os, sys
 sys.path.insert(0, sys.argv[1])
 import screen, screen43
-sys.exit(0 if os.path.exists(screen.BANK_FILE) and os.path.exists(screen43.BANK_FILE) else 1)
+if not (os.path.exists(screen.BANK_FILE) and os.path.exists(screen43.BANK_FILE)):
+    sys.exit(1)
+# banks of a calibration that did not finish (templates missing) do not count
+cal = os.path.join(os.path.dirname(screen.BANK_FILE), "calibration.json")
+try:
+    d = json.load(open(cal))
+    sys.exit(0 if not d.get("missing") and d.get("selftest_ok") else 1)
+except (OSError, ValueError):
+    sys.exit(0)
 PY
 }
 
