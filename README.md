@@ -286,6 +286,9 @@ Everything it makes is in `assets/` (`MKPARTY_ASSETS` in `mkparty.conf` or the e
 moves it), which is never in git:
 
 * `templates.npz`, `templates43.npz`: the screen templates (16:9 and 4:3). **Required.**
+  One is optional: "Please wait a moment" (16:9) shows only when a console waits for the
+  others while a room forms, which a calibration may not see; without its template that
+  screen reads as unknown, and the navigator just waits on it.
 * `captures/` (about 500 pictures, ~350 MB), `labels.json`, `labels43.json`,
   `sources.json`, `calibration.json`: the captures with their labels, which capture each
   template came from, and the run's summary (for `nav.py test` and rebuilding with
