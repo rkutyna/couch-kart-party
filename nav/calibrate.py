@@ -70,7 +70,7 @@ class Collector:
 
     # state -> (frames kept, s between them, consecutive same observations needed)
     LIMITS = {"welcome": (10, 0.12, 3), "disconnected_dialog": (10, 0.12, 3), "error_dialog": (10, 0.12, 3),
-              "race": (6, 1.0, 3), "title": (3, 0.8, 10), "health": (3, 0.8, 6),
+              "race": (6, 1.0, 3), "title": (3, 0.8, 6), "health": (3, 0.8, 6),
               "course_poll": (4, 0.3, 2), "next_race_menu": (3, 0.3, 2), "please_wait": (4, 0.3, 2)}
 
     def __init__(self, assets: str, log, per_key: int = 3, gap: float = 0.35, settle: int = 3):
@@ -296,7 +296,7 @@ def boot_to(p: Pilot, state: str = "main_menu", timeout: float = 150.0):
     """From wherever the instance is (booting, a menu) to `state` (main menu by default)."""
     def step(r):
         if r.state in ("health", "title"):
-            p.dwell(3.5)                     # (the title logo flies in: keep the settled picture)
+            p.dwell(4.5)                     # (the title logo flies in: keep the settled picture)
             p.act("A", timeout=3.0)
         elif r.state == "license_select" or r.state in S.DIALOG_STATES:
             p.dwell(0.8)
@@ -576,14 +576,12 @@ def tour_2p(p: Pilot, cat):
 LINGER = {"welcome": 1.6, "disconnected_dialog": 1.6, "error_dialog": 1.6, "main_menu": 0.8,
           "wfc_menu": 0.8, "ww_mode": 0.8, "vote_prompt": 1.2, "courses_cups": 0.8, "courses_list": 0.8,
           "next_race_menu": 2.5, "check_members": 0.6, "characters": 0.6, "vehicles": 0.6, "drift": 0.6,
-          "controller_reg": 1.5, "choose_mii": 1.2, "connect2": 1.2, "health": 3.5, "title": 3.5,
+          "controller_reg": 1.5, "choose_mii": 1.2, "connect2": 1.2, "health": 4.5, "title": 4.5,
           "license_select": 1.0, "create_license": 1.2, "wfc_notice": 1.2, "permit_prompt": 1.2,
           "wont_play": 1.2, "connecting": 0.0}
 # Two-player Characters online: the name labels sit lower than on the offline Multiplayer
-# screen, so both players' cursors tour the grid there (one row per step, ~1 s each; the
-# game confirms by itself about 25 s after VS).
-TOUR2P = [("yoshi", "peach"), ("wario", "waluigi"), ("donkey-kong", "bowser"), ("baby-mario", "baby-peach"),
-          ("toad", "koopa-troopa"), ("mario", "luigi")]
+# screen, so both players' cursors tour the grid there (_tour2p_step; one row per step,
+# ~1 s each; the game confirms by itself about 25 s after VS).
 ICON_CHARS = ["mario", "luigi", "peach"]
 
 
@@ -640,19 +638,34 @@ class Racer(threading.Thread):
 
 
 def _tour2p_step(w, tr, log):
-    """Online two-player Characters: walk both cursors through TOUR2P (hold ~1 s each),
-    then show player A's OK mark on Mario, then let the worker confirm."""
+    """Online two-player Characters: player A's cursor walks down the left column while
+    player B's walks down the right one (two cursors never meet that way), ~1 s on each
+    pair; then player A's OK mark is shown on Mario, then both confirm."""
     if not w.hold_pick:
         return
     st, cur = w.stable
     now = time.time()
     if st in ("vehicles", "drift", "searching") or (st not in ("characters", None, "unknown", "black")
-                                                     and tr["i"] > 0):
+                                                     and tr.get("plan")):
         w.hold_pick = False
         return
     if st != "characters" or not isinstance(cur, tuple):
         return
-    want = TOUR2P[tr["i"]]
+    grid = w.cat.char_grid
+    if "plan" not in tr:
+        # left column for A, right column for B, starting from the rows they are on
+        col = {c: sorted((rc[0], n) for n, rc in grid.items() if rc[1] == c) for c in (0, 1)}
+        ra = grid.get(cur[0], (2, 0))[0]
+        rb = grid.get(cur[1], (2, 1))[0]
+        if ra == rb and grid.get(cur[0], (0, 0))[1] == 1:
+            rb = (rb + 1) % 6
+        tr["plan"] = [(col[0][(ra + i) % 6][1], col[1][(rb + i) % 6][1]) for i in range(6)] + [("mario", "luigi")]
+        tr["i"], tr["at"], tr["ok_at"] = 0, None, None
+        log(f"cal i{w.k}: two-player character tour: {tr['plan']}")
+        w.set_goal(driver.replace(w.goal, character=tr["plan"][0][0], character_b=tr["plan"][0][1]))
+        return
+    plan = tr["plan"]
+    want = plan[tr["i"]]
     if (cur[0], cur[1]) != want:
         tr["at"] = None
         return
@@ -661,10 +674,10 @@ def _tour2p_step(w, tr, log):
         return
     if now - tr["at"] < 0.9:
         return
-    if tr["i"] < len(TOUR2P) - 1:
+    if tr["i"] < len(plan) - 1:
         tr["i"] += 1
         tr["at"] = None
-        a, b = TOUR2P[tr["i"]]
+        a, b = plan[tr["i"]]
         w.set_goal(driver.replace(w.goal, character=a, character_b=b))
         return
     if tr["ok_at"] is None:
@@ -700,13 +713,13 @@ def online_rounds(log, col: Collector, run_id: str, ks=(1, 7), rounds: int = 3, 
             t0 = time.time()
             for i, (k, w) in enumerate(sorted(r.workers.items(), key=lambda kw: (kw[1].two, kw[0]))):
                 slots = (2 * k, 2 * k + 1) if w.two else (2 * k,)
-                a_b = TOUR2P[0] if w.two else (ch, "luigi")
+                a_b = ("mario", "luigi") if w.two else (ch, "luigi")
                 g = driver.Goal("setup", round=rnd, character=a_b[0], vehicle="standard-kart-m", drift="auto",
                                 vote="luigi-circuit", go=True, slots=slots, character_b=a_b[1],
                                 vehicle_b="standard-kart-m", vote_b="luigi-circuit", enter=False)
                 w.set_goal(g)
                 w.hold_pick = w.two
-            tours = {k: {"i": 0, "at": None, "ok_at": None} for k, w in r.workers.items() if w.two}
+            tours = {k: {} for k, w in r.workers.items() if w.two}
             order = sorted(r.workers.values(), key=lambda w: (w.two, w.k))
             entered = 0
             while time.time() - t0 < timeout:
@@ -790,11 +803,15 @@ def template_rows(a43: bool, cat):
         ids = cat.char_grid if kind == "charname" else cat.veh_grid
         for key in ids:
             def roi_fn(e, key=key, labels=labels):
+                if e.get("tag") == "pilot" and kind == "charname":
+                    return None           # offline (Multiplayer) the labels sit higher: online only
                 c = e.get("cursor") or []
                 return labels[0] if c and c[0] == key else labels[1] if len(c) > 1 and c[1] == key else None
             rows.append((kind, key, (st, None, None), roi_fn, False))
 
     def ok_roi(e):
+        if e.get("tag") == "pilot":
+            return None                   # online only (see above)
         c = e.get("cursor") or []
         if len(c) < 3 or not c[2] or c[0] not in cat.char_grid:
             return None
@@ -897,6 +914,8 @@ def labels_from(entries, a43: bool, skip=()):
     for e in entries:
         if e["aspect"] != aspect or e["state"] in TRANSIENT or e["file"] in skip:
             continue
+        if a43 and e["state"] == "characters" and e.get("tag") == "pilot":
+            continue    # the offline two-player Characters screen (labels elsewhere) is not driven
         lab = {"state": e["state"]}
         if e.get("cursor") is not None:
             lab["cursor"] = e["cursor"]
