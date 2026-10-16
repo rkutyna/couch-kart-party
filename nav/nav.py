@@ -289,7 +289,19 @@ def cmd_build(a):
     if not os.path.exists(os.path.join(assets, "captures", "index.jsonl")):
         raise SystemExit(f"no calibration captures in {assets}; run ./mkparty calibrate")
     s = calibrate.build(assets, print)
-    return 0 if s["selftest_ok"] and not s["missing"] else 1
+    cal = os.path.join(assets, "calibration.json")
+    try:
+        d = json.load(open(cal))
+    except (OSError, ValueError):
+        d = {}
+    d.update({"missing": s["missing"], "selftest_ok": s["selftest_ok"], "captures": s["captures"],
+              "rebuilt": time.strftime("%Y-%m-%d %H:%M:%S")})
+    with open(cal, "w") as f:
+        json.dump(d, f, indent=1)
+    ok = s["selftest_ok"] and not s["missing"]
+    print(f"build-templates: {'DONE' if ok else 'INCOMPLETE'}: missing {len(s['missing'])}, "
+          f"self-test {'passed' if s['selftest_ok'] else 'FAILED'}")
+    return 0 if ok else 1
 
 
 def cmd_calibrate(a):

@@ -8,13 +8,13 @@
 #   ./mkparty setup --profiles [k ...] [--force]
 #                        once, after setup: prepare the 12 Dolphin profiles (i1..i6
 #                        single-player, i7..i12 two-player; license, online consent, second
-#                        player). Starts Dolphin; takes about 5 minutes; keep the Mac unlocked.
+#                        player). Starts Dolphin; the profiles take about 8 minutes; keep the Mac unlocked.
 #                        Profiles already set up are skipped. Then, if there are no screen
 #                        templates yet, runs `calibrate` (below).
 #   ./mkparty calibrate  generate the navigator's screen templates (and the test phones'
 #                        minimap icons) on this Mac from your own copy of the game: the
 #                        screens are read with Apple's Vision OCR, captured and cut into
-#                        templates in assets/ (MKPARTY_ASSETS). About 20 minutes; starts
+#                        templates in assets/ (MKPARTY_ASSETS). About 16-18 minutes; starts
 #                        Dolphin (silent). No game imagery is ever distributed with mkparty.
 #   ./mkparty up [--warm N]
 #                        start everything and print the phone URLs. Up to 12 players; the
@@ -186,7 +186,7 @@ cmd_calibrate() {
     [[ -f $INST_ROOT/i$k/mkparty-ready ]] || { print -u2 "profile i$k is not set up: run ./mkparty setup --profiles"; exit 1; }
   done
   keep_awake_for_work
-  say "generating the screen templates from your game (about 20 minutes; Dolphin windows appear, the games stay silent; keep the Mac unlocked)"
+  say "generating the screen templates from your game (about 16-18 minutes; Dolphin windows appear, the games stay silent; keep the Mac unlocked)"
   (cd "$ROOT/nav" && NAV_TV_AUDIO=0 python3 nav.py calibrate "$@") 2>&1 \
     | grep --line-buffered -E "cal|labelled captures|cursor correct|MISSING|WRONG|CURSOR|Traceback|Error" | tee -a "$MK_LOG"
   local rc=${pipestatus[1]}

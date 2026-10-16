@@ -83,7 +83,7 @@ Local settings live in `mkparty.conf` (created by setup from `mkparty.conf.examp
 in git): `DOLPHIN_APP`, `GAME_IMAGE`, and optionally `DEVKITPPC`, `PG_PORT`, `PARTY_PORT`,
 `HTTPS_PORT`, `MKPARTY_ASSETS`.
 
-Then, once, with the Mac unlocked (it starts Dolphin; about 25 minutes, the games stay
+Then, once, with the Mac unlocked (it starts Dolphin; about 25 minutes in all, the games stay
 silent; Dolphin windows come and go, leave them on screen):
 
     ./mkparty setup --profiles
@@ -91,11 +91,13 @@ silent; Dolphin windows come and go, leave them on screen):
 1. It prepares the 12 Dolphin profiles (`instances/i1..i6` single-player, `i7..i12`
    split-screen): creates the game's license, accepts the online data notice ("Permit"),
    registers the second controller and goes online once, all through the game's own menus
-   (about 6 minutes). Profiles already set up (marked `instances/i<k>/mkparty-ready`) are
-   skipped; `nav/nav.py setup <k> --force` redoes one.
-2. It then generates the screen templates from your game (`./mkparty calibrate`, about 15
+   (measured: about 7.5 minutes for all 12). Profiles already set up (marked
+   `instances/i<k>/mkparty-ready`) are skipped; `nav/nav.py setup <k> --force` redoes one.
+2. It then generates the screen templates from your game (`./mkparty calibrate`, about 16
    minutes here, as the new profiles already showed the first-boot screens; see
-   [Game assets](#game-assets)).
+   [Game assets](#game-assets)). If it ends with "did not finish cleanly", run
+   `./mkparty setup --profiles` (or `./mkparty calibrate`) again: banks with missing
+   templates do not count, and `./mkparty up` refuses to start with them.
 
 ## Run a party
 
@@ -206,6 +208,25 @@ navigator enters player A's choice in the first race, player B's in the next, an
   chosen; the navigator always gets there first, but a game that boots very slowly can
   miss the others' room and race separately.
 
+## Tests
+
+* Phone server unit tests: `cd party && go test ./...`
+* Phone server end to end (no Dolphin needed): start a partyd on a test port with test
+  pictures and a simulated navigator, e.g. `party/partyd -config <slots.json> -http :18000
+  -testpattern -fake-nav -statsdir <dir>` (slot 1's `pipe` in the slots file is the FIFO
+  below), then `cd party && go run ./cmd/testclient -base http://127.0.0.1:18000 -pipe
+  /abs/path/p1 -statsdir <dir>`. It checks video, input, slots, the lobby, the fake
+  navigator, phone stats and reconnects; see the header of `party/cmd/testclient/main.go`.
+* Screen recognition offline: `python3 nav/nav.py test [--refs DIR]` classifies labelled
+  captures with the screen templates in use and must print 100 % for both 16:9 and 4:3.
+  DIR is an assets folder (`captures/` + `labels*.json`, as calibrate leaves them;
+  default) or a folder with hand-labelled `refs/`, `refs43/`, `labels*.json`.
+* Calibration checks itself: every capture must come out as the text recognition labelled
+  it; the result (missing templates, self-test passed or not, times) is in
+  `assets/calibration.json`, and banks that fail it are not used.
+* Live: `run/bin/fakephones -config nav/fakephones/p3.json -wait-msg Ready` (test phones;
+  see nav/README.md) against a running `./mkparty up`.
+
 ## Project layout
 
     mkparty                 the command: setup, calibrate, up, down, status
@@ -236,8 +257,11 @@ on your Mac from your own copy of the game, by
     ./mkparty calibrate        # run automatically by ./mkparty setup --profiles
 
 It needs profiles i1 and i7 set up and nothing else running (`./mkparty down`), takes
-about 18 minutes (measured: first-boot screens on a scratch profile ~4 min, menu tours ~6
-min, three short online rounds ~9-10 min, building and checking ~1 min), keeps every game
+about 16-18 minutes (measured on an M3 Pro: 17.5 minutes with the scratch profile =
+first-boot screens ~4, menu tours ~5, three short online rounds ~9, building and checking
+~0.5; about 16 when setup already captured the first-boot screens; up to two extra online
+rounds of ~3 minutes each while a screen of the online part, e.g. "Please wait a moment",
+has not been seen), keeps every game
 silent and starts Dolphin windows; keep the Mac unlocked. What it does:
 
 1. It reads which screen is on display **without templates**: Apple's Vision text

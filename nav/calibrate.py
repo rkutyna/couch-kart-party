@@ -71,8 +71,11 @@ class Collector:
     # state -> (frames kept, s between them, consecutive same observations needed)
     LIMITS = {"welcome": (10, 0.12, 3), "disconnected_dialog": (10, 0.12, 3), "error_dialog": (10, 0.12, 3),
               "race": (6, 1.0, 3), "title": (3, 0.8, 6), "health": (3, 0.8, 6),
-              "course_poll": (4, 0.3, 2), "next_race_menu": (3, 0.3, 2), "please_wait": (4, 0.3, 2),
-              "preparing": (3, 0.25, 2)}
+              "course_poll": (4, 0.3, 2), "next_race_menu": (3, 0.3, 2), "please_wait": (4, 0.3, 1),
+              "preparing": (3, 0.25, 1)}
+    # (preparing / please_wait often show for one observation only; their fading frames are
+    # left out at build time by the weak-text check)
+    NO_FADE_CHECK = {"preparing", "please_wait"}
 
     def __init__(self, assets: str, log, per_key: int = 3, gap: float = 0.35, settle: int = 3):
         self.dir = os.path.join(assets, "captures")
@@ -110,7 +113,7 @@ class Collector:
         self.lum[k] = lum
         if res.state in TRANSIENT or n_same < settle:
             return None
-        if prev is not None and abs(lum - prev) > max(4.0, 0.06 * lum):
+        if prev is not None and abs(lum - prev) > max(4.0, 0.06 * lum) and res.state not in self.NO_FADE_CHECK:
             return None                 # fading in or out
         aspect = aspect_of(a43)
         d = res.detail
@@ -693,7 +696,12 @@ def _tour2p_step(w, tr, log):
 
 
 EXTRA_ROUNDS = 2      # rounds added while a screen of the online part has not been captured
-ONLINE_SCREENS = [("16x9", "preparing"), ("16x9", "please_wait"), ("16x9", "results"), ("4x3", "results"),
+# "Please wait a moment" (16:9) shows only when a console has to wait for the others while
+# a room forms; it was seen in some calibrations and in none of the parties of 2026-10-15/16.
+# Its template is made when the screen was seen and is optional otherwise (the screen then
+# reads as unknown; the navigator waits on unknown screens in a room).
+OPTIONAL = {("t_pleasewait", "pleasewait")}
+ONLINE_SCREENS = [("16x9", "preparing"), ("16x9", "results"), ("4x3", "results"),
                   ("16x9", "next_race_menu"), ("4x3", "next_race_menu"), ("16x9", "disconnected_dialog"),
                   ("4x3", "disconnected_dialog"), ("16x9", "vote_prompt"), ("4x3", "vote_prompt"),
                   ("4x3", "opponents_chosen")]
@@ -810,7 +818,7 @@ def template_rows(a43: bool, cat):
     rows = []
     for kind, key, legacy, spec in mod.TEMPLATES:
         roi = mod.ROIS[kind] if a43 else S._roi_for(kind, key)
-        rows.append((kind, key, spec, (lambda e, roi=roi: roi), legacy is None))
+        rows.append((kind, key, spec, (lambda e, roi=roi: roi), legacy is None or (kind, key) in OPTIONAL))
     if not a43:
         for kind, d in S.NAME_REFS.items():
             for key in d:
@@ -891,6 +899,8 @@ def select_sources(entries, a43: bool, cat, capdir: str, log):
         if not allc:
             if not all(opt for _c, opt, _s in cands_by_row):
                 missing.append(f"{aspect} {kind}:{key} (needs {[s for _c, o, s in cands_by_row if not o]})")
+            elif (kind, key) in OPTIONAL:
+                log(f"cal build {aspect}: optional {kind}:{key} not made (its screen was not seen)")
             continue
         thr = COVER.get(kind, 0.90)
         sc = {}

@@ -500,7 +500,7 @@ else print -r -- "setup finished."; fi
 typeset -a ready=( "$ROOT"/instances/i*/mkparty-ready(N) )
 k_ready=${#ready}
 if (( k_ready < 12 )); then
-  print -r -- "Last step (once, about 25 minutes, starts Dolphin; keep the Mac unlocked):"
+  print -r -- "Last step (once, about 25 minutes: profiles ~8, screen templates ~16; starts Dolphin; keep the Mac unlocked):"
   print -r -- "  ./mkparty setup --profiles"
   print -r -- "Give the terminal Screen Recording permission (System Settings > Privacy & Security) when macOS asks."
 else
@@ -508,6 +508,6 @@ else
   if [[ -f $assets/templates.npz && -f $assets/templates43.npz ]] || [[ -z ${MKPARTY_ASSETS:-} && -f $ROOT/nav/templates.npz ]]; then
     print -r -- "All 12 Dolphin profiles are set up. Start a party with: ./mkparty up"
   else
-    print -r -- "The profiles are set up but the screen templates are not: run ./mkparty calibrate (about 20 minutes)."
+    print -r -- "The profiles are set up but the screen templates are not: run ./mkparty calibrate (about 16-18 minutes)."
   fi
 fi
