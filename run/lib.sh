@@ -130,6 +130,62 @@ wait_exit() {
   return 0
 }
 
+# Keep-awake: a caffeinate process (a per-process power assertion; no system setting is
+# changed) that keeps the display and the Mac awake, so that the screen does not lock while
+# a party or a calibration runs (a locked screen stops the window capture). Its pid is
+# recorded in run/pids/caffeinate.pid. MKPARTY_KEEP_AWAKE=0 turns all of it off.
+KEEP_AWAKE_PID_FILE=$PID_DIR/caffeinate.pid
+KEEP_AWAKE_LOG=$LOG_DIR/caffeinate.log
+KEEP_AWAKE_STARTED=0   # set to 1 by keep_awake_start when it started a caffeinate
+KEEP_AWAKE_OWN=0       # set by mkparty when the caffeinate is its own (setup/calibrate)
+
+# keep_awake_enabled: true unless MKPARTY_KEEP_AWAKE=0.
+keep_awake_enabled() {
+  [[ ${MKPARTY_KEEP_AWAKE:-1} != 0 ]]
+}
+
+# keep_awake_running: true if the recorded caffeinate pid is alive and is caffeinate.
+keep_awake_running() {
+  local p
+  p=$(read_pid caffeinate)
+  pid_alive "$p" && proc_is "$p" caffeinate
+}
+
+# keep_awake_start [wait_pid]: starts caffeinate -d -i -m -s (no display, idle, disk or
+# system sleep on AC) in its own session, so Ctrl-C in the terminal does not reach it, and
+# records its pid. With wait_pid it exits by itself when that process exits (caffeinate -w).
+# Idempotent: if the recorded caffeinate is running, nothing is started. Sets
+# KEEP_AWAKE_STARTED=1 only when this call started one. Returns 1 if it could not start.
+keep_awake_start() {
+  local -a args
+  KEEP_AWAKE_STARTED=0
+  keep_awake_enabled || return 0
+  keep_awake_running && return 0
+  args=(-d -i -m -s)
+  [[ -n ${1:-} ]] && args+=(-w "$1")
+  mkdir -p "$PID_DIR" "$LOG_DIR"
+  print -r -- "---- $(date) caffeinate ${args[*]}" >> "$KEEP_AWAKE_LOG"
+  perl -MPOSIX -e 'POSIX::setsid(); exec @ARGV' caffeinate "${args[@]}" < /dev/null >> "$KEEP_AWAKE_LOG" 2>&1 &
+  print -r -- $! > "$KEEP_AWAKE_PID_FILE"
+  sleep 0.3
+  keep_awake_running || { rm -f "$KEEP_AWAKE_PID_FILE"; return 1; }
+  KEEP_AWAKE_STARTED=1
+  return 0
+}
+
+# keep_awake_stop: stops the recorded caffeinate, but only if its command is caffeinate,
+# and removes the pid file. Safe when nothing is recorded. Prints nothing.
+keep_awake_stop() {
+  local p
+  p=$(read_pid caffeinate)
+  if pid_alive "$p" && proc_is "$p" caffeinate; then
+    kill -TERM "$p" 2>/dev/null
+    wait_exit "$p" 5 || kill -KILL "$p" 2>/dev/null
+  fi
+  rm -f "$KEEP_AWAKE_PID_FILE"
+  return 0
+}
+
 # Profiles: instances/i1 .. i6 are single-player profiles (16:9, one pad), i7 .. i12 are
 # two-player split-screen profiles (4:3, pads p1 + p2). Each has its own save and online
 # identity (never copy saves between them).

@@ -21,7 +21,8 @@
 #                        player count follows the phones: at Start the navigator brings up
 #                        the games the players need (<= 6: one each, 16:9; 7-12: two-player
 #                        split screen, 4:3). N games (default 3) are kept ready in the lobby.
-#   ./mkparty down       stop everything mkparty started (nothing is left running)
+#   ./mkparty down       stop everything mkparty started (nothing is left running; also
+#                        releases the keep-awake that "up" started, see README)
 #   ./mkparty status     what is running, the lobby state, the phone URLs
 #
 # "up" starts the local game server (server/start.sh) and the navigator (nav/nav.py run),
@@ -73,6 +74,33 @@ d=json.load(open(sys.argv[1]))
 sys.exit(0 if d.get("pid")==int(sys.argv[2]) and d.get("ready") else 1)' "$RUN/nav-status.json" "$p" 2>/dev/null
 }
 
+keep_awake_status() {
+  local p; p=$(read_pid caffeinate)
+  if ! keep_awake_enabled; then print -r -- "== keep-awake: off (MKPARTY_KEEP_AWAKE=0)"
+  elif keep_awake_running; then print -r -- "== keep-awake: on (caffeinate pid $p; mkparty down releases it)"
+  else print -r -- "== keep-awake: off"; fi
+}
+
+# keep_awake_for_work: setup --profiles and calibrate run for minutes with the Dolphin windows
+# on screen, so the Mac is kept awake while this process runs (caffeinate -w $$, which also
+# ends it when this process dies by any means). A caffeinate this process started is marked
+# KEEP_AWAKE_OWN; one that was already running (a party's) is left alone.
+keep_awake_for_work() {
+  keep_awake_enabled || return 0
+  if keep_awake_start $$; then
+    if (( KEEP_AWAKE_STARTED )); then KEEP_AWAKE_OWN=1; fi
+  else
+    say "WARNING: could not keep the Mac awake; if the screen locks, the window capture stops"
+  fi
+}
+
+# keep_awake_release_work: EXIT trap of setup --profiles and calibrate, set in the top-level
+# dispatch below (a zsh EXIT trap set inside a function would run when that function returns).
+keep_awake_release_work() {
+  if (( KEEP_AWAKE_OWN )); then keep_awake_stop; fi
+  return 0
+}
+
 lobby_message() {
   curl -s -m 3 http://127.0.0.1:$PARTY_PORT/api/nav/lobby 2>/dev/null \
     | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get("phase",""), "|", d.get("message",""))' 2>/dev/null
@@ -118,6 +146,7 @@ cmd_setup() {
   say "== mkparty setup --profiles $*"
   check_installed
   nav_running && { print -u2 "a party is running; ./mkparty down first"; exit 1; }
+  keep_awake_for_work
   detached "$ROOT/server/start.sh" >> "$MK_LOG" 2>&1 || { print -u2 "server/start.sh failed; see $MK_LOG"; exit 1; }
   (cd "$ROOT/nav" && python3 nav.py setup "$@") 2>&1 | grep --line-buffered -E "setup|READY|FAILED|ERROR|Traceback" | tee -a "$MK_LOG"
   # The screen templates are generated from this Mac's own game (nothing game-derived is
@@ -148,6 +177,7 @@ cmd_calibrate() {
   for k in 1 7; do
     [[ -f $INST_ROOT/i$k/mkparty-ready ]] || { print -u2 "profile i$k is not set up: run ./mkparty setup --profiles"; exit 1; }
   done
+  keep_awake_for_work
   say "generating the screen templates from your game (about 20 minutes; Dolphin windows appear, the games stay silent; keep the Mac unlocked)"
   (cd "$ROOT/nav" && NAV_TV_AUDIO=0 python3 nav.py calibrate "$@") 2>&1 \
     | grep --line-buffered -E "cal|labelled captures|cursor correct|MISSING|WRONG|CURSOR|Traceback|Error" | tee -a "$MK_LOG"
@@ -171,6 +201,10 @@ cmd_up() {
   for (( k = 1; k <= 12; k++ )); do [[ -f $INST_ROOT/i$k/mkparty-ready ]] || missing+=("i$k"); done
   if (( ${#missing} )); then
     print -r -- "Not set up yet: ${missing[*]} (run ./mkparty setup --profiles once). Parties that need them will fail."
+  fi
+  if keep_awake_enabled; then
+    if keep_awake_start; then say "Keeping the Mac awake while the party runs (mkparty down releases it)."
+    else say "WARNING: could not keep the Mac awake; the screen may lock during the party."; fi
   fi
   stop_nav
   say "starting the game server"
@@ -218,6 +252,10 @@ cmd_down() {
   stop_nav
   "$RUN/down.sh" --force 2>&1 | tee -a "$MK_LOG"
   "$ROOT/server/stop.sh" >> "$MK_LOG" 2>&1 && say "game server stopped"
+  local was_awake=0
+  keep_awake_running && was_awake=1
+  keep_awake_stop
+  if (( was_awake )); then say "keep-awake released (the Mac may sleep again)"; else say "keep-awake was not running"; fi
   local left
   left=$(ps -axo pid=,command= | grep -E "$ROOT/instances/|$ROOT/party/partyd|stream_slot|stream_inst|$ROOT/run/bin/wincap|nav.py (run|setup)|wfc-server/wwfc|bin/postgres -D $ROOT" | grep -v grep)
   if [[ -n $left ]]; then
@@ -230,13 +268,16 @@ cmd_down() {
 cmd_status() {
   "$RUN/status.sh" 2>/dev/null | grep -v '^{' 
   if nav_running; then print -r -- "== navigator pid $(read_pid nav) (log $NAV_LOG)"; else print -r -- "== navigator not running"; fi
+  keep_awake_status
   local m; m=$(lobby_message); [[ -n $m ]] && print -r -- "lobby: $m"
   print_urls
 }
 
 case ${1:-} in
-  setup) shift; cmd_setup "$@" ;;
-  calibrate) shift; cmd_calibrate "$@" ;;
+  setup) shift
+    if [[ ${1:-} == --profiles ]]; then trap keep_awake_release_work EXIT; fi
+    cmd_setup "$@" ;;
+  calibrate) shift; trap keep_awake_release_work EXIT; cmd_calibrate "$@" ;;
   up) shift; cmd_up "$@" ;;
   down) cmd_down ;;
   status) cmd_status ;;

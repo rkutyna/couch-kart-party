@@ -118,7 +118,10 @@ N more games…" on the phones) and games that are not needed are stopped.
 
 Keep the Mac unlocked while the party runs: while the screen is locked the games'
 windows cannot be captured, so the navigator sees nothing and waits (`up` warns about
-it). Keep the Dolphin windows on the Mac's screen (not minimised, not on another desktop
+it). The Mac is kept awake while a party or calibration runs (`caffeinate`, released by
+`./mkparty down` or when calibration ends), so the screen does not lock on its own; caffeinate
+cannot unlock a screen that is already locked. Set `MKPARTY_KEEP_AWAKE=0` to disable it.
+Keep the Dolphin windows on the Mac's screen (not minimised, not on another desktop
 or behind a full-screen app): macOS delivers their pictures slowly when they are
 hidden, which makes the phone video stutter and the navigator slower.
 
