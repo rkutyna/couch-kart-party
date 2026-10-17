@@ -381,15 +381,22 @@
   const STALL_GRACE_MS = 5000;       // no checks this long after connect
   const STALL_STREAK_MS = 30000;     // a stall this soon after the last one backs off further
   const STALL_MAX_DELAY_MS = 8000;
+  const STALL_BRAKE_COUNT = 3;       // this many stall reconnects ...
+  const STALL_BRAKE_WINDOW_MS = 120000; // ... within this long ...
+  const STALL_BRAKE_MS = 120000;     // ... stop auto-reconnecting for stalls this long
   const stall = {
-    quality: null,      // totalVideoFrames at the last tick
+    quality: null,      // video element totalVideoFrames at the last tick
     decoded: null,      // inbound-rtp framesDecoded at the last tick
-    progressAt: 0,      // performance.now() of the last new frame (or the last reset)
+    packets: null,      // inbound-rtp packetsReceived at the last tick
+    bytes: null,        // inbound-rtp bytesReceived at the last tick
+    progressAt: 0,      // performance.now() of the last progress (or the last reset)
     connectedAt: 0,     // performance.now() of the last connect
     streak: 0,          // stall reconnects in a row
     lastAt: -Infinity,  // performance.now() of the last stall reconnect
+    reconnects: [],     // performance.now() of recent stall reconnects (for the brake)
+    brakeUntil: -Infinity, // performance.now() until which stalls do not reconnect
+    busy: false,        // a watchdog getStats call is in flight
   };
-  let decodedFrames = null; // inbound-rtp framesDecoded from the last stats sample
 
   class RoomFull extends Error {}
   class GameInProgress extends Error {}
@@ -455,7 +462,8 @@
       stall.progressAt = stall.connectedAt;
       stall.quality = null;
       stall.decoded = null;
-      decodedFrames = null;
+      stall.packets = null;
+      stall.bytes = null;
       recentreTilt(0);
       updateStatus('connected');
     } else if (st === 'disconnected') {
@@ -642,7 +650,6 @@
         net.prev = cur;
         net.prevAt = now;
       }
-      decodedFrames = inb ? inb.framesDecoded : null;
       net.last = payload;
       updateNetOverlay();
       await fetch('/api/stats', {
@@ -674,17 +681,45 @@
   // ---------- video stall watchdog ----------
   // A connected phone whose video has stopped decoding is rebuilt: the
   // PeerConnection is torn down and the phone rejoins with the same clientId
-  // (scheduleRejoin). Frames count as moving when the video element's
-  // totalVideoFrames changed (or, in a browser without that counter, the inbound-rtp
-  // framesDecoded from the stats sample). No movement for STALL_MS is a stall. Hidden pages, the first
-  // STALL_GRACE_MS after a connect and phones that do not show the video (lobby,
-  // starting: their slot may have no video source yet) are not checked.
+  // (scheduleRejoin). Progress is any of these advancing since the last tick: the
+  // video element's totalVideoFrames, the inbound-rtp framesDecoded, and (only when
+  // neither frame counter moved) inbound-rtp packetsReceived or bytesReceived. Some
+  // iPhone browsers never advance totalVideoFrames for a live WebRTC stream, so no
+  // single counter is trusted. No progress for STALL_MS is a stall. The watchdog reads
+  // its own getStats each tick, so it does not depend on the once-a-second stats
+  // sample. Hidden pages, the first STALL_GRACE_MS after a connect and phones that do
+  // not show the video (lobby, starting: their slot may have no video source yet) are
+  // not checked.
   function playbackFrames() {
     try {
       if (video.getVideoPlaybackQuality) return video.getVideoPlaybackQuality().totalVideoFrames;
       if (typeof video.webkitDecodedFrameCount === 'number') return video.webkitDecodedFrameCount;
-    } catch (e) { /* not supported: rely on the stats sample */ }
+    } catch (e) { /* not supported: the stats counters below still count */ }
     return null;
+  }
+
+  // Inbound video counters from a getStats report, or null when there is none.
+  async function inboundCounters(p) {
+    try {
+      const rep = await p.getStats();
+      let inb = null;
+      rep.forEach((r) => {
+        if (!inb && r.type === 'inbound-rtp' && (r.kind === 'video' || r.mediaType === 'video')) inb = r;
+      });
+      return inb ? { decoded: inb.framesDecoded, packets: inb.packetsReceived, bytes: inb.bytesReceived } : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Progress between two ticks. prev and cur hold quality, decoded, packets and bytes;
+  // a null (unavailable) value never counts. A changed counter counts, whichever way it
+  // moved, since a rebuilt PeerConnection starts its counters again. The packet and byte
+  // counters are the last resort: they count only when neither frame counter moved.
+  function stallProgress(prev, cur) {
+    const moved = (a, b) => typeof a === 'number' && typeof b === 'number' && a !== b;
+    if (moved(cur.quality, prev.quality) || moved(cur.decoded, prev.decoded)) return true;
+    return moved(cur.packets, prev.packets) || moved(cur.bytes, prev.bytes);
   }
 
   // One-off event for the phone's stats log. It goes through the same POST
@@ -699,29 +734,42 @@
     }).catch(() => { /* logging only */ });
   }
 
-  function stallTick() {
-    const now = performance.now();
-    const q = playbackFrames();
-    const d = decodedFrames;
-    // What the player sees counts: the video element's frame counter when the browser has
-    // one (a decoder that keeps decoding behind a frozen <video> is still a stall), else
-    // the decoder's framesDecoded from the stats sample.
-    const moved = q != null ? q !== stall.quality : (d != null && d !== stall.decoded);
-    stall.quality = q;
-    stall.decoded = d;
-    const checking = !document.hidden && !!pc && pc.connectionState === 'connected' && slot > 0 &&
-      now - stall.connectedAt >= STALL_GRACE_MS && currentView() === 'play';
-    if (moved || !checking) {
-      stall.progressAt = now;
-      return;
+  async function stallTick() {
+    if (stall.busy) return;
+    stall.busy = true;
+    try {
+      const p = pc;
+      const inb = p && p.connectionState === 'connected' ? await inboundCounters(p) : null;
+      if (p !== pc) return; // the connection was rebuilt while the stats were read
+      const now = performance.now();
+      const cur = Object.assign({ quality: playbackFrames(), decoded: null, packets: null, bytes: null }, inb);
+      const progressed = stallProgress(stall, cur);
+      stall.quality = cur.quality;
+      stall.decoded = cur.decoded;
+      stall.packets = cur.packets;
+      stall.bytes = cur.bytes;
+      const checking = !document.hidden && !!p && p.connectionState === 'connected' && slot > 0 &&
+        now - stall.connectedAt >= STALL_GRACE_MS && currentView() === 'play';
+      if (progressed || !checking) {
+        stall.progressAt = now;
+        return;
+      }
+      if (now - stall.progressAt >= STALL_MS) stallReconnect(now);
+    } finally {
+      stall.busy = false;
     }
-    if (now - stall.progressAt >= STALL_MS) stallReconnect(now);
   }
 
   // Backoff: 1 s, 2 s, 4 s, then 8 s. A stall within STALL_STREAK_MS of the
   // previous one continues the streak; a longer gap starts it again at 1 s.
+  // STALL_BRAKE_COUNT stall reconnects within STALL_BRAKE_WINDOW_MS switch stall
+  // reconnects off for STALL_BRAKE_MS, so a phone that cannot recover stops cycling.
   function stallReconnect(now) {
     if (rejoinTimer) return;
+    if (now < stall.brakeUntil) {
+      stall.progressAt = now;
+      return;
+    }
     stall.streak = now - stall.lastAt < STALL_STREAK_MS ? stall.streak + 1 : 1;
     stall.lastAt = now;
     stall.progressAt = now;
@@ -732,9 +780,18 @@
       delayMs: delay,
       quality: stall.quality,
       decoded: stall.decoded,
+      packets: stall.packets,
+      bytes: stall.bytes,
       readyState: video.readyState,
       pcState: pc ? pc.connectionState : null,
     });
+    stall.reconnects = stall.reconnects.filter((t) => now - t < STALL_BRAKE_WINDOW_MS);
+    stall.reconnects.push(now);
+    if (stall.reconnects.length >= STALL_BRAKE_COUNT) {
+      stall.brakeUntil = now + STALL_BRAKE_MS;
+      stall.reconnects = [];
+      logEvent({ event: 'video_stall_brake', untilMs: STALL_BRAKE_MS, count: STALL_BRAKE_COUNT });
+    }
     updateStatus('video stalled, rejoining');
     scheduleRejoin(delay);
   }
