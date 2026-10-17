@@ -682,8 +682,8 @@
   // A connected phone whose video has stopped decoding is rebuilt: the
   // PeerConnection is torn down and the phone rejoins with the same clientId
   // (scheduleRejoin). Progress is any of these advancing since the last tick: the
-  // video element's totalVideoFrames, the inbound-rtp framesDecoded, and (only when
-  // neither frame counter moved) inbound-rtp packetsReceived or bytesReceived. Some
+  // video element's totalVideoFrames, the inbound-rtp framesDecoded, and (only in a
+  // browser with neither frame counter) inbound-rtp packetsReceived or bytesReceived. Some
   // iPhone browsers never advance totalVideoFrames for a live WebRTC stream, so no
   // single counter is trusted. No progress for STALL_MS is a stall. The watchdog reads
   // its own getStats each tick, so it does not depend on the once-a-second stats
@@ -715,10 +715,13 @@
   // Progress between two ticks. prev and cur hold quality, decoded, packets and bytes;
   // a null (unavailable) value never counts. A changed counter counts, whichever way it
   // moved, since a rebuilt PeerConnection starts its counters again. The packet and byte
-  // counters are the last resort: they count only when neither frame counter moved.
+  // counters are the last resort for a browser with no frame counter at all: packets
+  // still arriving into a frozen decoder must not hide the stall.
   function stallProgress(prev, cur) {
-    const moved = (a, b) => typeof a === 'number' && typeof b === 'number' && a !== b;
+    const num = (a) => typeof a === 'number';
+    const moved = (a, b) => num(a) && num(b) && a !== b;
     if (moved(cur.quality, prev.quality) || moved(cur.decoded, prev.decoded)) return true;
+    if (num(cur.quality) || num(cur.decoded)) return false;
     return moved(cur.packets, prev.packets) || moved(cur.bytes, prev.bytes);
   }
 
