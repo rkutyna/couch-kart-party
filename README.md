@@ -190,6 +190,10 @@ navigator enters player A's choice in the first race, player B's in the next, an
 * A player was "Disconnected from the room": the game drops a player who does not
   move for about 30–40 s. The navigator takes that game back online; when every game
   of the race is out, the lobby returns to the start screen by itself.
+* The screen locked during a party although the Mac is kept awake: caffeinate stops the
+  Mac from sleeping, but a manual lock (Ctrl-Cmd-Q, closing the lid, Touch ID) or a
+  screen-lock policy still locks it, and the phones' pictures freeze until it is unlocked.
+  Unlock it; the navigator carries on by itself.
 * To start over: the host taps Reset in the lobby, or `./mkparty down` and
   `./mkparty up` again.
 * `server/netcheck.sh` checks that the game patch, the server's payload and the Dolphin
@@ -213,10 +217,12 @@ navigator enters player A's choice in the first race, player B's in the next, an
 * Phone server unit tests: `cd party && go test ./...`
 * Phone server end to end (no Dolphin needed): start a partyd on a test port with test
   pictures and a simulated navigator, e.g. `party/partyd -config <slots.json> -http :18000
-  -testpattern -fake-nav -statsdir <dir>` (slot 1's `pipe` in the slots file is the FIFO
-  below), then `cd party && go run ./cmd/testclient -base http://127.0.0.1:18000 -pipe
+  -testpattern -fake-nav -statsdir <dir>`, then `cd party && go run ./cmd/testclient -base http://127.0.0.1:18000 -pipe
   /abs/path/p1 -statsdir <dir>`. It checks video, input, slots, the lobby, the fake
   navigator, phone stats and reconnects; see the header of `party/cmd/testclient/main.go`.
+  The slots file needs 4 slots: slots 1 and 2 with a FIFO each (`mkfifo`; slot 1's is the
+  `-pipe` above), slots 3 and 4 with `"pipe": ""`, e.g.
+  `{"slots":[{"slot":1,"rtpPort":5204,"pipe":"/abs/p1"},{"slot":2,"rtpPort":5206,"pipe":"/abs/p2"},{"slot":3,"rtpPort":5208,"pipe":""},{"slot":4,"rtpPort":5210,"pipe":""}]}`.
 * Screen recognition offline: `python3 nav/nav.py test [--refs DIR]` classifies labelled
   captures with the screen templates in use and must print 100 % for both 16:9 and 4:3.
   DIR is an assets folder (`captures/` + `labels*.json`, as calibrate leaves them;
