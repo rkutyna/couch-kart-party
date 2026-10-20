@@ -78,6 +78,7 @@
     <p>Rotate your phone sideways.</p>
     <p id="startStatus" class="startStatus"></p>
     <p id="startMsg" class="startMsg"></p>
+    <button class="sm backLobby" type="button" hidden>BACK TO LOBBY</button>
   </div>
 </section>
 
@@ -85,6 +86,7 @@
   <div class="card">
     <h1 id="waitTitle">Waiting for the next round</h1>
     <p id="waitMsg"></p>
+    <button class="sm backLobby" type="button" hidden>BACK TO LOBBY</button>
   </div>
 </section>
 
@@ -99,6 +101,7 @@
       </div>
     </div>
     <div class="row">
+      <button class="btn drift" data-bit="128">DRIFT</button>
       <button class="btn item" data-bit="64">ITEM</button>
       <button class="btn trick" data-bit="256">TRICK</button>
     </div>
@@ -118,10 +121,7 @@
   </div>
 
   <div id="right" class="zone right">
-    <div class="row">
-      <button class="btn brake" data-bit="2">BRAKE</button>
-      <button class="btn drift" data-bit="128">DRIFT</button>
-    </div>
+    <button class="btn brake" data-bit="2">BRAKE</button>
     <button class="btn accel" data-bit="1">ACCEL</button>
   </div>
 </div>

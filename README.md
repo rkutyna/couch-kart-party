@@ -151,10 +151,12 @@ in `mkparty.conf`); it is read when the game server starts.
    the certificate once: tap "Show details" / "Advanced" and "visit this website"
    (https is needed for tilt steering; the `http` address works without tilt).
 2. Pick a name, character, vehicle, drift and a course to vote for; tap Ready.
-3. The host (the first player) taps Start. The phones show what their game is doing
+3. The host (the first player) taps Start; at least two players must be ready (the game
+   cannot race online alone). The phones show what their game is doing
    ("Picking Mario…", "Finding the others…"). After about a minute (1–7 players: 55–75 s
    measured) the phone switches to live video at the Course Poll screen and the
-   player drives.
+   player drives: steer by tilting the phone (https) or with the slider; DRIFT, ITEM and
+   TRICK are on the left, BRAKE and ACCEL on the right.
 4. When the race is over the phone shows a course picker ("vote for the next race")
    with a countdown. Pick a course and tap Lock in. The navigator takes the game
    through to the next Course Poll and gives the controls back.
@@ -195,8 +197,9 @@ navigator enters player A's choice in the first race, player B's in the next, an
   Mac from sleeping, but a manual lock (Ctrl-Cmd-Q, closing the lid, Touch ID) or a
   screen-lock policy still locks it, and the phones' pictures freeze until it is unlocked.
   Unlock it; the navigator carries on by itself.
-* To start over: the host taps Reset in the lobby, or `./mkparty down` and
-  `./mkparty up` again.
+* To start over: the host taps Reset in the lobby (or BACK TO LOBBY on the "Get ready"
+  and waiting screens, e.g. when a start hangs on "Still looking for the others'
+  room"), or `./mkparty down` and `./mkparty up` again.
 * `server/netcheck.sh` checks that the game patch, the server's payload and the Dolphin
   profiles agree.
 * Logs: `run/logs/` (`mkparty.log`, `nav.log`, `partyd.log`, `i<k>.log`,
@@ -310,6 +313,25 @@ moves it), which is never in git:
 
 Installs from before calibration existed may have `nav/templates.npz` etc.; they are used
 only when `assets/` has no banks.
+
+## Contributing
+
+Improvements are welcome: open an issue for a bug or an idea, or send a pull request.
+Some ideas that would help:
+
+* Game sound on the phones (today only the host's game plays, on the Mac).
+* A better test-phone driver (`party/cmd/fakephones`): it sometimes gets stuck off the
+  road, and the game then drops that player.
+* Fewer than two players: Mario Kart Wii cannot race online alone, so a solo mode would
+  need a different route (e.g. offline VS against the CPU).
+* Support for other platforms (Linux, Windows), other game regions and the more
+  unlocked characters, vehicles and cups.
+* Phone controls and layout ideas from real parties.
+
+Please keep game data out of the repository: no disc images, saves, screenshots or
+templates (they are generated locally, see [Game assets](#game-assets)). Contributions
+to this project's code are under the MIT License; changes to the two patch files stay
+under their projects' licences (see [Licence](#licence)).
 
 ## Licence
 

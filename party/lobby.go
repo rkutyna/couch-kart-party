@@ -90,6 +90,7 @@ type lobbyView struct {
 	HostSlot       int          `json:"hostSlot"`
 	CatalogVersion string       `json:"catalogVersion"`
 	LockedSlots    []int        `json:"lockedSlots"`
+	MinPlayers     int          `json:"minPlayers"` // ready players Start needs
 	Players        []playerView `json:"players"`
 }
 
@@ -183,7 +184,8 @@ func (s *Server) viewLocked(nav bool) any {
 		}
 		return lobbyView{
 			Version: s.version, Phase: s.phase, Message: s.message, HostSlot: host,
-			CatalogVersion: s.catalogVersion, LockedSlots: s.lockedSlotsLocked(), Players: players,
+			CatalogVersion: s.catalogVersion, LockedSlots: s.lockedSlotsLocked(),
+			MinPlayers: s.minPlayers(), Players: players,
 		}
 	}
 	players := make([]navPlayerView, 0, len(s.slots))
@@ -463,6 +465,16 @@ func (s *Server) hostFromClientLocked(w http.ResponseWriter, clientID string) *s
 	return sl
 }
 
+// minPlayers is how many ready players Start needs: Mario Kart Wii does not start an
+// online race with one player (its game would search for a room for ever). The fake
+// navigator has no game behind it, so the tests may start a race alone.
+func (s *Server) minPlayers() int {
+	if s.fakeNav {
+		return 1
+	}
+	return 2
+}
+
 func (s *Server) handleLobbyStart(w http.ResponseWriter, r *http.Request) {
 	var req clientReq
 	if !decode(w, r, &req) {
@@ -493,8 +505,8 @@ func (s *Server) handleLobbyStart(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusConflict, "no connected players")
 		return
 	}
-	if ready == 0 {
-		writeErr(w, http.StatusConflict, "at least one player must be ready")
+	if ready < s.minPlayers() {
+		writeErr(w, http.StatusConflict, "at least two players must be ready (the game cannot race online alone)")
 		return
 	}
 	for _, sl := range s.slots {

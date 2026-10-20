@@ -369,3 +369,4 @@ button.on { background: var(--btn-on); transform: scale(0.96); }
 .voteCourses .pTile:disabled { opacity: 0.55; }
 .voteCourses .pTile.sel { background: var(--btn-on); }
 .voteRandom:disabled, .voteChange:disabled { opacity: 0.55; }
+.backLobby { display: block; margin: 3vmin auto 0; }

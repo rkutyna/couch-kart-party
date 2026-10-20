@@ -53,6 +53,9 @@
   const menuToggle = $('menuToggle');
   const menuPad = $('menuPad');
   const lobbyBtn = $('lobbyBtn');
+  // Host-only way back to the lobby from the Get ready / waiting screens (a start
+  // that cannot finish, e.g. the game is still looking for the others' room).
+  const backLobbyBtns = document.querySelectorAll('.backLobby');
   const voteOverlay = $('voteOverlay');
   const voteCountdown = $('voteCountdown');
   const voteRandom = $('voteRandom');
@@ -956,13 +959,20 @@
     if (!any) playerList.appendChild(el('li', 'pchar', 'Nobody here yet.'));
   }
 
+  // Ready players Start needs (the server's minPlayers; the game cannot race online alone).
+  function minPlayers() {
+    return lobby && lobby.minPlayers > 0 ? lobby.minPlayers : 1;
+  }
+
   function defaultHint(me) {
     if (!slot) return 'Connecting...';
     if (!me || !me.name || !me.character || !me.vehicle) return 'Pick a name, character and vehicle, then tap READY.';
     if (!me.ready) return 'Tap READY to race. Players who are not ready sit out.';
     const n = readyCount();
-    if (isHost()) return n > 0 ? 'Tap START when you are set.' : 'START unlocks when at least one player is ready.';
-    return n > 0 ? 'Waiting for the host to start.' : 'Waiting for someone to be ready.';
+    const min = minPlayers();
+    if (n < min) return 'Waiting for ' + (min - n === 1 ? 'one more player' : (min - n) + ' more players') +
+      ': the game needs at least ' + min + ' to race.';
+    return isHost() ? 'Tap START when you are set.' : 'Waiting for the host to start.';
   }
 
   function renderLobby() {
@@ -992,8 +1002,9 @@
     const n = readyCount();
     startBtn.hidden = !host;
     startBtn.textContent = 'Start (' + n + (n === 1 ? ' player)' : ' players)');
-    startBtn.disabled = !(host && lobby.phase === 'lobby' && n > 0);
+    startBtn.disabled = !(host && lobby.phase === 'lobby' && n >= minPlayers());
     lobbyBtn.hidden = !host;
+    for (const b of backLobbyBtns) b.hidden = !host || lobby.phase === 'lobby';
     renderWaiting(me);
 
     lobbyHint.textContent = errText || defaultHint(me);
@@ -1137,9 +1148,11 @@
     lobbyPost('/api/lobby/player', { ready: !(me && me.ready) });
   });
   startBtn.addEventListener('click', () => lobbyPost('/api/lobby/start', {}));
-  lobbyBtn.addEventListener('click', () => {
+  const confirmReset = () => {
     if (window.confirm('Send everyone back to the lobby?')) lobbyPost('/api/lobby/reset', {});
-  });
+  };
+  lobbyBtn.addEventListener('click', confirmReset);
+  for (const b of backLobbyBtns) b.addEventListener('click', confirmReset);
 
   // ---------- invite (QR code and URL for a friend) ----------
   const inviteBtn = $('inviteBtn');

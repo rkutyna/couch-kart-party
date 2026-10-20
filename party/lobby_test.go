@@ -314,10 +314,12 @@ func TestStartLocksReadySlotsAndSitOutsGated(t *testing.T) {
 	}
 }
 
-func TestStartNeedsOneReadyAndHostOnly(t *testing.T) {
+func TestStartNeedsTwoReadyAndHostOnly(t *testing.T) {
 	s := testServer(t)
+	s.addSlot(&slot{cfg: SlotConfig{Slot: 3, Label: "P3"}})
 	setOccupied(s, 1, "A", false)
 	setOccupied(s, 2, "B", false)
+	setOccupied(s, 3, "C", false)
 	post := func(id string) int {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/api/lobby/start", strings.NewReader(`{"clientId":"`+id+`"}`))
@@ -330,12 +332,25 @@ func TestStartNeedsOneReadyAndHostOnly(t *testing.T) {
 	if c := post("A"); c != http.StatusConflict {
 		t.Errorf("start with nobody ready: %d, want 409", c)
 	}
+	// One ready player: the game cannot race online alone (it searches for ever).
 	s.byNum[2].pl.ready = true
-	if c := post("A"); c != http.StatusOK {
-		t.Errorf("start with one ready (A not ready): %d, want 200", c)
+	if c := post("A"); c != http.StatusConflict {
+		t.Errorf("start with one ready: %d, want 409", c)
 	}
-	if s.byNum[1].locked || !s.byNum[2].locked {
-		t.Error("only the ready player should be locked")
+	if v := s.viewLocked(false).(lobbyView); v.MinPlayers != 2 {
+		t.Errorf("lobby view minPlayers %d, want 2", v.MinPlayers)
+	}
+	s.byNum[3].pl.ready = true
+	if c := post("A"); c != http.StatusOK {
+		t.Errorf("start with two ready (A not ready): %d, want 200", c)
+	}
+	if s.byNum[1].locked || !s.byNum[2].locked || !s.byNum[3].locked {
+		t.Error("only the ready players should be locked")
+	}
+	// The fake navigator has no game behind it: one ready player is enough there.
+	s.fakeNav = true
+	if s.minPlayers() != 1 {
+		t.Errorf("fake-nav minPlayers %d, want 1", s.minPlayers())
 	}
 }
 
