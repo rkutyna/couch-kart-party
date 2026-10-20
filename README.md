@@ -187,8 +187,9 @@ navigator enters player A's choice in the first race, player B's in the next, an
   started, so its two players miss that race.
 * A phone shows "Game restarted. Rejoining…": the navigator noticed a crashed or
   frozen game and restarted it; that player joins the next race.
-* A player was "Disconnected from the room": the game drops a player who does not
-  move for about 30–40 s. The navigator takes that game back online; when every game
+* A player was "Disconnected from the room" / "You were disconnected from the other
+  players": the game drops a player who presses nothing for about 30 s, or who makes
+  no progress round the course (stuck off the road) for about a minute. The navigator takes that game back online; when every game
   of the race is out, the lobby returns to the start screen by itself.
 * The screen locked during a party although the Mac is kept awake: caffeinate stops the
   Mac from sleeping, but a manual lock (Ctrl-Cmd-Q, closing the lid, Touch ID) or a
@@ -232,6 +233,10 @@ navigator enters player A's choice in the first race, player B's in the next, an
   `assets/calibration.json`, and banks that fail it are not used.
 * Live: `run/bin/fakephones -config nav/fakephones/p3.json -wait-msg Ready` (test phones;
   see nav/README.md) against a running `./mkparty up`.
+  The test phones' simple driver sometimes gets stuck off the road; the game then drops
+  that player after about a minute ("You were disconnected from the other players").
+  That is the game's own rule, not a fault of the party; count only races where a
+  stuck kart is not the cause.
 
 ## Project layout
 
